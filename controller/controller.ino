@@ -694,11 +694,12 @@ void ads_loop() {
 
 void setup() {
   Serial.begin(115200);
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, HIGH);
   
   while (!Serial) delay(10);
   
   Serial.println(F("\n=== Flash Test Starting ==="));
-  
   // Initialize flash
   init_flash();
   
@@ -709,8 +710,6 @@ void setup() {
   left_loadcell_adc_16bit_smoothed.begin(SMOOTHED_AVERAGE, 10);
 
   ads.begin();
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, HIGH);
 
   right_loadcell_adc_16bit_smoothed.clear();
   left_loadcell_adc_16bit_smoothed.clear();
