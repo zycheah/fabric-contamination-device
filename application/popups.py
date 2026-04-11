@@ -1,6 +1,5 @@
 import json
 import requests
-from pathlib import Path
 import customtkinter as ctk
 from customtkinter import filedialog
 from diagnostics import register_log, diagnostics_path
@@ -348,7 +347,7 @@ class Firmware(ctk.CTkToplevel):
 
     def check_internet_connection(self):
         try:
-            requests.head(self.r1_c1.get(), timeout=5) # Use the entry value for connection check
+            requests.head(self.r1_c1.get(), timeout=5)
             return True
         except Exception:
             return False
