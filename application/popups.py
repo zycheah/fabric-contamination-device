@@ -277,12 +277,6 @@ class Firmware(ctk.CTkToplevel):
         self.r1_c1.grid(row=1, column=1, sticky="e", padx=10, pady=(1, 2))
         self.r1_c1.insert(0, "https://github.com/zycheah/fcd-gui-tests")
 
-        self.update_status = None
-        self.owner = None
-        self.repo_name = None
-        self.download_url = None
-        self.auto_checked = False
-
         self.status_frame = ctk.CTkScrollableFrame(master=self.frame0, fg_color="#F9F9FA", height=290)
         self.status_frame.grid(row=2, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
         self.status_frame.grid_columnconfigure(0, weight=1)
@@ -293,7 +287,9 @@ class Firmware(ctk.CTkToplevel):
         self.refresh_button = ctk.CTkButton(master=self.frame0, text="↻", width=121, command=self.on_button_click)
         self.refresh_button.place(relx=1.0, rely=1.0, x=-20, y=-20, anchor="se")
 
-        self.after(100, self.auto_check_for_updates)
+        self.update_status = None
+        self.download_url = None
+        self.check_for_updates()
     
     def on_button_click(self):
         if self.update_status == "update_available":
@@ -304,11 +300,6 @@ class Firmware(ctk.CTkToplevel):
             else:
                 self.status.configure(text="❌ Error: Could not determine download link.", text_color="red")
         else:
-            self.check_for_updates()
-    
-    def auto_check_for_updates(self):
-        if not self.auto_checked:
-            self.auto_checked = True
             self.check_for_updates()
 
     def check_for_updates(self):
@@ -323,7 +314,7 @@ class Firmware(ctk.CTkToplevel):
         try:
             from main import version
             from packaging.version import Version
-            from github import Github, GithubException
+            from github import Github
 
             self.repo = Github().get_repo("zycheah/fcd-gui-tests")
             release_tag = self.repo.get_latest_release().tag_name.lstrip("v")
@@ -339,7 +330,7 @@ class Firmware(ctk.CTkToplevel):
                 self.refresh_button.configure(text="Up to Date")
                 self.status.configure(text="You are on the latest version.")
 
-        except GithubException :
+        except Exception:
             self.status.configure(text=f"❌ Failed to reach GitHub. Please verify the Repository URL.", text_color="red")
         
         finally:
