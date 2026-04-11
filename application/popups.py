@@ -1,6 +1,5 @@
 import json
 import requests
-import re
 from pathlib import Path
 import customtkinter as ctk
 from customtkinter import filedialog
@@ -216,7 +215,7 @@ class Diagnostics(ctk.CTkToplevel):
         self.log_label.grid(row=0, column=3, sticky="w", padx=10, pady=2)
 
         register_log(self.add_log)
-        self.load_existing_logs() # Load existing log entries from the file
+        self.load_existing_logs()
 
     def add_log(self, datetime, id, source, msg):
 
@@ -238,9 +237,9 @@ class Diagnostics(ctk.CTkToplevel):
         try:
             with open(diagnostics_path, 'r', encoding='utf-8') as f:
                 for line in f:
-                    if not line.strip(): #Check if the line becomes empty
-                        continue # Skip empty lines/spaces
-                    entry = json.loads(line.strip()) #Only call json.loads if line has actual content
+                    if not line.strip():
+                        continue
+                    entry = json.loads(line.strip())
                     self.add_log(entry["datetime"], entry["id"], entry["source"], entry["msg"])
         except (FileNotFoundError, json.JSONDecodeError):
             pass
@@ -276,13 +275,11 @@ class Firmware(ctk.CTkToplevel):
 
         self.r1_c1 = ctk.CTkEntry(master=self.frame0, justify="left", width=300)
         self.r1_c1.grid(row=1, column=1, sticky="e", padx=10, pady=(1, 2))
-        self.repo_url = "https://github.com/zyinggggg/fcd-gui-tests"
-        self.r1_c1.insert(0, self.repo_url)
+        self.r1_c1.insert(0, "https://github.com/zycheah/fcd-gui-tests")
 
         self.update_status = None
         self.owner = None
         self.repo_name = None
-        self.repo_version = None
         self.download_url = None
         self.auto_checked = False
 
@@ -300,7 +297,6 @@ class Firmware(ctk.CTkToplevel):
     
     def on_button_click(self):
         if self.update_status == "update_available":
-            # Open browser to the download link
             if self.download_url:
                 import webbrowser
                 webbrowser.open_new(self.download_url)
@@ -323,61 +319,35 @@ class Firmware(ctk.CTkToplevel):
         self.refresh_button.configure(state="disabled")
         self.status.configure(text="⏳ Checking for updates...\n\nPlease wait...", text_color="blue")
         self.update()
-        
+
         try:
             from main import version
-            # 1. Determine Current Version
-            current_version_str = str(version).strip()
-            current_version_parts = [int(p) for p in current_version_str.split('.') if p.isdigit()]
-            current_version = tuple(current_version_parts[:2] + [0] * (2 - len(current_version_parts)))
+            from packaging.version import Version
+            from github import Github, GithubException
+
+            self.repo = Github().get_repo("zycheah/fcd-gui-tests")
+            release_tag = self.repo.get_latest_release().tag_name.lstrip("v")
+            release_date = self.repo.get_latest_release().published_at.strftime("%m/%d/%Y")
             
-            # 2. Extract owner and repo name
-            url_parts = self.r1_c1.get().rstrip("/").replace(".git", "").split("/")
-            self.owner = url_parts[-2]
-            self.repo_name = url_parts[-1]
-
-            # 3. Check Remote Version in main.py
-            raw_url = f"https://raw.githubusercontent.com/{self.owner}/{self.repo_name}/main/application/main.py"
-            response = requests.get(raw_url, timeout=10)
-            
-            if response.status_code == 200:
-                content = response.text
-                
-                version_match = re.search(r"version\s*=\s*([\d\.]+)", content)
-                release_date_match = re.search(r'release_date\s*=\s*["\']([^"\']+)["\']', content)
-
-                if version_match:
-                    repo_version_str = version_match.group(1).strip()
-                    repo_version_parts = [int(p) for p in repo_version_str.split('.') if p.isdigit()]
-                    self.repo_version = tuple(repo_version_parts[:2] + [0] * (2 - len(repo_version_parts)))
-                    
-                    repo_release_date = release_date_match.group(1) if release_date_match else "Unknown Date"
-
-                    if self.repo_version > current_version:
-                        self.update_status = "update_available"
-                        self.refresh_button.configure(text="Install")
-                        self.new_version_info(self.repo_version, repo_release_date)
-                        self.download_url = self.downloads()
-                    else:
-                        self.update_status = "up_to_date"
-                        self.refresh_button.configure(text="Up to Date")
-                        self.status.configure(text="You are on the latest version.")
-                else:
-                    self.status.configure(text="❌ Error: Could not find version in repository 'main.py' file.", text_color="red")
-
+            if Version(release_tag) > Version(version):
+                self.update_status = "update_available"
+                self.refresh_button.configure(text="Install")
+                self.new_version_info(release_tag, release_date)
+                self.download_url = self.downloads()
             else:
-                self.status.configure(text=f"❌ Failed to reach GitHub (Status: {response.status_code}). Please verify the Repository URL.", text_color="red")
+                self.update_status = "up_to_date"
+                self.refresh_button.configure(text="Up to Date")
+                self.status.configure(text="You are on the latest version.")
 
-        except Exception as e:
-            self.status.configure(text=f"❌ An unexpected error occurred: {str(e)}", text_color="red")
+        except GithubException :
+            self.status.configure(text=f"❌ Failed to reach GitHub. Please verify the Repository URL.", text_color="red")
         
         finally:
             self.refresh_button.configure(state="normal")
     
     def new_version_info(self, repo_version, repo_release_date):
         from main import resource_path
-
-        updates_text = (f"New version v{'.'.join(map(str, repo_version))} "f"is available! ({repo_release_date})\n\n")
+        updates_text = (f"New version v{repo_version} "f"is available! ({repo_release_date})\n\n")
 
         version_file = resource_path("data/version.txt") 
         with open(version_file, "r", encoding="utf-8") as f:
@@ -385,7 +355,6 @@ class Firmware(ctk.CTkToplevel):
 
         self.status.configure(text=updates_text)
 
-    
     def check_internet_connection(self):
         try:
             requests.head(self.r1_c1.get(), timeout=5) # Use the entry value for connection check
@@ -395,7 +364,6 @@ class Firmware(ctk.CTkToplevel):
     
     def downloads(self):
         import platform
-
         os_name = platform.system()
 
         os_keywords = {
@@ -407,20 +375,15 @@ class Firmware(ctk.CTkToplevel):
         if os_name not in os_keywords:
             raise RuntimeError(f"Unsupported OS: {os_name}")
         
-        tag = f"v{'.'.join(map(str, self.repo_version))}"
-        api_url = f"https://api.github.com/repos/{self.owner}/{self.repo_name}/releases/tags/{tag}"
-
-        response = requests.get(api_url, timeout=10)
-        response.raise_for_status()
-
-        release = response.json()
-        assets = release.get("assets", [])
+        release = self.repo.get_latest_release()
+        assets = release.get_assets()
 
         for asset in assets:
-            name = asset.get("name", "").lower()
+            name = asset.name.lower()
             for kw in os_keywords[os_name]:
                 if kw in name:
-                    return asset["browser_download_url"]
+                    return asset.browser_download_url
+
         raise RuntimeError("No compatible installer found for your OS.")
 
 class AdvancedControl(ctk.CTkToplevel):
