@@ -54,8 +54,6 @@ float         rotary_motor_speed_rpm                                    = 0.00f;
 long          rotary_motor_position_deg                                 = 0;
 long          rotary_motor_initial_position_deg                         = 0;
 long          rotary_motor_current_position_deg                         = 0;
-long          rotary_motor_last_position_step                           = 0;
-long          rotary_motor_current_position_step                        = 0;
 
 const byte    right_z_axis_motor_pin_step                               = 8;
 const byte    right_z_axis_motor_pin_dir                                = 15;
@@ -114,9 +112,13 @@ double        pid_experiment_target_load_lbf                            = 0.00;
 long          pid_experiment_start_time_ms                              = 0;
 long          pid_experiment_duration_ms                                = 0;
 long          pid_experiment_duration_half_time_ms                      = 0;
+float         pid_experiment_revolution_rev                             = 0.00f;
+float         pid_experiment_revolution_half_rev                        = 0.00f;
 
 uint8_t       pid_tuning_mode                                           = 0;
 int8_t        pid_swing_direction                                       = 1;
+float         pid_swing_start_revolution_rev                            = 0.00f;
+float         pid_swing_rev_per_cycle                                   = 0.00f;
 
 Adafruit_ADS1115 ads;
 int16_t       right_loadcell_adc_16bit                                  = 0;
@@ -144,6 +146,7 @@ struct Config {
   double      pid_z_axis_motor_max_speed_rpm                            = 0.00;
   uint16_t    pid_z_axis_motor_ramplen_step                             = 0;
 
+  uint8_t     pid_calibration_mode                                      = 0;
   long        pid_calibration_stable_required_time_ms                   = 0;
   uint8_t     pid_calibration_stable_required_count                     = 0;
   float       pid_calibration_load_error_percent                        = 0.00f;
@@ -378,43 +381,39 @@ void pid_experiment_2() {
   pid_load_error_percent = fabs((total_load_lbf - pid_experiment_target_load_lbf) * 100 / pid_experiment_target_load_lbf);
 
   if (pid_load_error_percent <= cfg.pid_calibration_load_error_percent) {
-    pid_calibration_stable_count++;
-    if (pid_calibration_stable_count >= cfg.pid_calibration_stable_required_count) {
-      pid_calibration_stable_count = 0;
-      right_z_axis_motor.rotate(0);
-      left_z_axis_motor.rotate(0);
-      pid_settling_time_s = (millis() - pid_calibration_start_time_ms) / 1000.0f;
-      comm_status = true;
-      Serial.write((uint8_t*)"\xCC\x20\x05\xEE", 4);
-      comm_status = false;
-      seq_index++;
-      return;
+    if (cfg.pid_calibration_mode == 0){
+      // Time-based
+      if ((millis() - pid_calibration_stable_start_time_ms) >= cfg.pid_calibration_stable_required_time_ms) {
+        right_z_axis_motor.rotate(0);
+        left_z_axis_motor.rotate(0);
+        pid_settling_time_s = (millis() - pid_calibration_start_time_ms) / 1000.0f;
+        pid_calibration_stable_start_time_ms = 0;
+        comm_status = true;
+        Serial.write((uint8_t*)"\xCC\x20\x05\xEE", 4);
+        comm_status = false;
+        seq_index++;
+        return;
+      }
+    } 
+    else if (cfg.pid_calibration_mode == 1){
+      // Count-based
+      pid_calibration_stable_count++;
+      if (pid_calibration_stable_count >= cfg.pid_calibration_stable_required_count) {
+        pid_calibration_stable_count = 0;
+        right_z_axis_motor.rotate(0);
+        left_z_axis_motor.rotate(0);
+        pid_settling_time_s = (millis() - pid_calibration_start_time_ms) / 1000.0f;
+        comm_status = true;
+        Serial.write((uint8_t*)"\xCC\x20\x05\xEE", 4);
+        comm_status = false;
+        seq_index++;
+        return;
+      }
     }
-  }
-  else {
+  } else {
+    pid_calibration_stable_start_time_ms = 0;
     pid_calibration_stable_count = 0;
   }
-  // if (pid_load_error_percent <= cfg.pid_calibration_load_error_percent) {
-  //   if (pid_calibration_stable_start_time_ms == 0) {
-  //     pid_calibration_stable_start_time_ms = millis();
-  //   } 
-  //   else {
-  //     if ((millis() - pid_calibration_stable_start_time_ms) >= cfg.pid_calibration_stable_required_time_ms) {
-  //       right_z_axis_motor.rotate(0);
-  //       left_z_axis_motor.rotate(0);
-  //       pid_settling_time_s = (millis() - pid_calibration_start_time_ms) / 1000.0f;
-  //       pid_calibration_stable_start_time_ms = 0;
-  //       comm_status = true;
-  //       Serial.write((uint8_t*)"\xCC\x20\x05\xEE", 4);
-  //       comm_status = false;
-  //       seq_index++;
-  //       return;
-  //     }
-  //   } 
-  // }
-  // else {
-  //   pid_calibration_stable_start_time_ms = 0;
-  // }
 
   if (pid_load_error_percent < cfg.pid_tuning_mode_limit_percent) {
     pid_control.SetTunings(cfg.pid_conservative_k_p, cfg.pid_conservative_k_i, cfg.pid_conservative_k_d);
@@ -443,20 +442,19 @@ void pid_experiment_2() {
 }
 
 void pid_experiment_3() {
-  pid_experiment_start_time_ms = millis();
-  pid_experiment_duration_half_time_ms = pid_experiment_duration_ms / 2;
+  pid_experiment_revolution_half_rev = pid_experiment_revolution_rev / 2;
   comm_status = true;
   Serial.write((uint8_t*)"\xCC\x20\x06\xEE", 4);
   comm_status = false;
-  // rotary_motor_initial_position_deg = rotary_motor.read();
-  rotary_motor_last_position_step = rotary_motor.readSteps();
+  rotary_motor_initial_position_deg = rotary_motor.read();
   total_revolution_rev = 0;
   if (pid_experiment_mode == 0x01 || pid_experiment_mode == 0x03) {
     rotary_motor.rotate(-1);
   }
   else if (pid_experiment_mode == 0x04){
     pid_swing_direction = 1;
-    rotary_motor.doSteps(rotary_motor_full_step_rev);
+    pid_swing_start_revolution_rev = total_revolution_rev;
+    rotary_motor.rotate(1);
   }
   else {
     rotary_motor.rotate(1);
@@ -469,7 +467,7 @@ void pid_experiment_3() {
 
 void pid_experiment_4() {
 
-  if (millis() - pid_experiment_start_time_ms >= pid_experiment_duration_half_time_ms) {
+  if (total_revolution_rev >= pid_experiment_revolution_half_rev) {
     seq_index++;
     return;
   }
@@ -509,9 +507,9 @@ void pid_experiment_4() {
     left_z_axis_motor.rotate(0);
   }
 
-  rotary_motor_current_position_step = rotary_motor.readSteps();
-  total_revolution_rev += fabs((float)(rotary_motor_current_position_step - rotary_motor_last_position_step) / (float)rotary_motor_full_step_rev);
-  rotary_motor_last_position_step = rotary_motor_current_position_step;
+  rotary_motor_current_position_deg = rotary_motor.read();
+  total_revolution_rev += fabs((float)(rotary_motor_current_position_deg - rotary_motor_initial_position_deg) / 360.0f);
+  rotary_motor_initial_position_deg = rotary_motor_current_position_deg;
 }
 
 void pid_experiment_5() {
@@ -526,7 +524,7 @@ void pid_experiment_5() {
 
 void pid_experiment_6() {
 
-  if (millis() - pid_experiment_start_time_ms >= pid_experiment_duration_ms) {
+  if (total_revolution_rev >= pid_experiment_revolution_rev) {
     seq_index++;
     return;
   }
@@ -566,14 +564,14 @@ void pid_experiment_6() {
     left_z_axis_motor.rotate(0);
   }
 
-  rotary_motor_current_position_step = rotary_motor.readSteps();
-  total_revolution_rev += fabs((float)(rotary_motor_current_position_step - rotary_motor_last_position_step) / (float)rotary_motor_full_step_rev);
-  rotary_motor_last_position_step = rotary_motor_current_position_step;
+  rotary_motor_current_position_deg = rotary_motor.read();
+  total_revolution_rev += fabs((float)(rotary_motor_current_position_deg - rotary_motor_initial_position_deg) / 360.0f);
+  rotary_motor_initial_position_deg = rotary_motor_current_position_deg;
 }
 
 void pid_swing_1(){
 
-  if (millis() - pid_experiment_start_time_ms >= pid_experiment_duration_ms) {
+  if (total_revolution_rev >= pid_experiment_revolution_rev) {
     seq_index++;
     return;
   }
@@ -613,11 +611,16 @@ void pid_swing_1(){
     left_z_axis_motor.rotate(0);
   }
 
-  rotary_motor_current_position_step = rotary_motor.readSteps();
-  total_revolution_rev += fabs((float)(rotary_motor_current_position_step - rotary_motor_last_position_step) / (float)rotary_motor_full_step_rev);
-  rotary_motor_last_position_step = rotary_motor_current_position_step;
+  rotary_motor_current_position_deg = rotary_motor.read();
+  float delta_deg = fabs((float)(rotary_motor_current_position_deg - rotary_motor_initial_position_deg));
+  if (delta_deg > 180.0f) {
+    delta_deg = 360.0f - delta_deg;
+  }
+  total_revolution_rev += delta_deg / 360.0f;
+  rotary_motor_initial_position_deg = rotary_motor_current_position_deg;
 
-  if (!rotary_motor.moving()){
+  if (total_revolution_rev - pid_swing_start_revolution_rev >= pid_swing_rev_per_cycle){
+    rotary_motor.rotate(0);
     seq_index++;
   }
 
@@ -625,13 +628,15 @@ void pid_swing_1(){
 
 void pid_swing_2() {
   
-  if (millis() - pid_experiment_start_time_ms >= pid_experiment_duration_ms) {
+  if (total_revolution_rev >= pid_experiment_revolution_rev) {
     seq_index++;
     return;
   }
 
   pid_swing_direction = -pid_swing_direction;
-  rotary_motor.doSteps(pid_swing_direction * rotary_motor_full_step_rev);
+  pid_swing_start_revolution_rev = total_revolution_rev;
+  rotary_motor_initial_position_deg = rotary_motor.read();
+  rotary_motor.rotate(pid_swing_direction);
   seq_index--;
 }
 
@@ -748,6 +753,7 @@ void comm() {
         cfg.pid_z_axis_motor_max_speed_rpm = obj["pid_z_axis_motor_max_speed_rpm"].as<float>();
         cfg.pid_z_axis_motor_ramplen_step = obj["pid_z_axis_motor_ramplen_step"].as<float>();
 
+        cfg.pid_calibration_mode = obj["pid_calibration_mode"].as<uint8_t>();
         cfg.pid_calibration_stable_required_time_ms = obj["pid_calibration_stable_required_time_ms"].as<float>();
         cfg.pid_calibration_stable_required_count = obj["pid_calibration_stable_required_count"].as<float>();
         cfg.pid_calibration_load_error_percent = obj["pid_calibration_load_error_percent"].as<float>();
@@ -965,7 +971,7 @@ void comm() {
             return;
           }
 
-          if (Serial.readBytes((uint8_t*)&pid_experiment_duration_ms, sizeof(pid_experiment_duration_ms)) != sizeof(pid_experiment_duration_ms)) {
+          if (Serial.readBytes((uint8_t*)&pid_experiment_revolution_rev, sizeof(pid_experiment_revolution_rev)) != sizeof(pid_experiment_revolution_rev)) {
             Serial.write((uint8_t*)"\xCC\x20\x03\xEE", 4);
             comm_status = false;
             return;
@@ -977,6 +983,12 @@ void comm() {
             seq_start(pid_experiment_double, sizeof(pid_experiment_double) / sizeof(pid_experiment_double[0]));
           }
           else if (pid_experiment_mode == 0x04) {
+            if (Serial.readBytes((uint8_t*)&pid_swing_rev_per_cycle, sizeof(pid_swing_rev_per_cycle)) != sizeof(pid_swing_rev_per_cycle)){
+              pid_swing_rev_per_cycle = 1.0f;
+            }
+            if (pid_swing_rev_per_cycle <= 0.0f){
+              pid_swing_rev_per_cycle = 1.0f;
+            }
             seq_start(pid_experiment_swing, sizeof(pid_experiment_swing) / sizeof(pid_experiment_swing[0]));
           } 
         }
