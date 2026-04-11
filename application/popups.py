@@ -85,9 +85,6 @@ class AdvancedSettings(ctk.CTkToplevel):
 
         for key, entry in parent.config.items():
 
-            if key == "pid_calibration_mode":
-                continue
-
             label = ctk.CTkLabel(master=self.frame0, text=key)
             label.grid(row=self.frame0_row, column=0, sticky="w", padx=10, pady=2)
 
@@ -98,18 +95,6 @@ class AdvancedSettings(ctk.CTkToplevel):
             setattr(self, f"{key}_value", value)
             self.frame0_row += 1
 
-            if key == "pid_z_axis_motor_ramplen_step":
-                label = ctk.CTkLabel(master=self.frame0, text="PID Calibration Mode:")
-                label.grid(row=self.frame0_row, column=0, sticky="w", padx=10, pady=2)
-
-                option = ctk.CTkSegmentedButton(self.frame0, values=["Time", "Count"], command=self.set_pid_calibration_mode)
-                option.grid(row=self.frame0_row, column=3, sticky="e", padx=10, pady=2)
-                initial_mode = "Time" if str(parent.config.get("pid_calibration_mode", "0")) == "1" else "Count"
-                option.set(initial_mode)
-                self.set_pid_calibration_mode_option = option
-
-                self.frame0_row += 1
-
         self.load_button = ctk.CTkButton(master=self.frame0, text="Load", command=self.load, width=121)
         self.load_button.grid(row=self.frame0_row, column=1, sticky="e", padx=0, pady=2)
 
@@ -119,27 +104,14 @@ class AdvancedSettings(ctk.CTkToplevel):
         self.configure_button = ctk.CTkButton(master=self.frame0, text="Configure", command=self.configure, width=121)
         self.configure_button.grid(row=self.frame0_row, column=3, sticky="e", padx=10, pady=2)
 
-        self.set_pid_calibration_mode(self.set_pid_calibration_mode_option.get())
-    
-    def set_pid_calibration_mode(self, value):
-        if value == "Time":
-            self.pid_calibration_stable_required_count_value.configure(state="disabled")
-            self.pid_calibration_stable_required_time_ms_value.configure(state="normal")
-        else:
-            self.pid_calibration_stable_required_time_ms_value.configure(state="disabled")
-            self.pid_calibration_stable_required_count_value.configure(state="normal")
-
     def configure(self):
         config = self.parent.config
         for key in list(config.keys()):
-            if key == "pid_calibration_mode":
-                continue
             value = getattr(self, f"{key}_value").get().strip()
             if value:
                 config[key] = value
 
         with open(self.parent.config_path, "w") as f:
-            config["pid_calibration_mode"] = "1" if self.set_pid_calibration_mode_option.get() == "Time" else "0"
             json.dump(self.parent.config, f, indent=4)
 
         self.destroy()
@@ -214,7 +186,7 @@ class Diagnostics(ctk.CTkToplevel):
         self.parent = parent
 
         self.title("Diagnostics")
-        self.geometry("800x350")
+        self.geometry("1200x400")
         self.resizable(False, False)
         self.transient(parent)
         self.focus()
@@ -229,7 +201,7 @@ class Diagnostics(ctk.CTkToplevel):
         self.frame0.grid_columnconfigure(0, weight=50, uniform="Silent_Creme")
         self.frame0.grid_columnconfigure(1, weight=30, uniform="Silent_Creme")
         self.frame0.grid_columnconfigure(2, weight=30, uniform="Silent_Creme")
-        self.frame0.grid_columnconfigure(3, weight=100, uniform="Silent_Creme")
+        self.frame0.grid_columnconfigure(3, weight=200, uniform="Silent_Creme")
 
         self.datetime_label = ctk.CTkLabel(master=self.frame0, text="Date/Time")
         self.datetime_label.grid(row=0, column=0, sticky="w", padx=10, pady=2)

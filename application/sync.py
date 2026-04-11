@@ -24,7 +24,8 @@ class Sync:
         self.health()
 
         self.performance()
-        
+
+        self.pid_calibration_restart = False
         self.pid_calibration_status = False
         self.pid_calibration_status_old = False
         self.pid_calibration_start_time = None
@@ -285,6 +286,11 @@ class Sync:
                 self.parent.PID_results.r2_c1.configure(text=f"{self.parent.data['pid_settling_time_s']['value']:.2f}")
                 self.parent.PID_results.r3_c1.configure(text=f"{self.parent.data['pid_load_error_running_avg_percent']['value']:.2f}")
 
+            if not self.pid_calibration_status and self.pid_calibration_restart:
+                if self.parent.data['right_z_axis_motor_speed_step_s']['value'] == 0 and self.parent.data['left_z_axis_motor_speed_step_s']['value'] == 0:
+                    self.pid_experiment()
+                    self.pid_calibration_restart = False
+
             if self.pid_calibration_status and not self.pid_calibration_status_old:
                 self.pid_calibration_start_time = time.time()
                 self.pid_plot_time.clear()
@@ -295,6 +301,10 @@ class Sync:
 
             if self.pid_calibration_status:
                 calibration_elapsed_time = time.time() - self.pid_calibration_start_time
+                if calibration_elapsed_time * 1000 >= int(self.parent.config.get("pid_calibration_limit_time_ms")):
+                    self.pid_experiment_terminate()
+                    self.pid_calibration_restart = True
+
                 self.pid_plot_time.append(calibration_elapsed_time)
                 self.pid_plot_load.append(self.parent.data["total_load_lbf"]["value"])
                 if self.pid_target_load_lbf != 0:
@@ -316,7 +326,7 @@ class Sync:
                     hh, rem = divmod(elapsed_s,3600)
                     mm, ss = divmod(rem, 60)
                     self.parent.control_frame.r16_c1.configure(text=f"{hh:02d}:{mm:02d}:{ss:02d}")
-                self.parent.control_frame.r17_c1.configure(text=f"{total_rev:.3f}")
+                self.parent.control_frame.r17_c1.configure(text=f"{total_rev:.2f}")
 
                 experiment_elapsed_time = time.time() - self.pid_experiment_start_time
 
@@ -520,7 +530,12 @@ class Sync:
                 duration_s = (hh*3600) + (mm*60) + ss
                 pid_experiment_revolution_rev = (duration_s/60.0) * pid_rotary_motor_speed_rpm
 
-            self.comm.pid_experiment(pid_experiment_mode, pid_rotary_motor_speed_rpm, self.pid_target_load_lbf, pid_experiment_revolution_rev)
+            try:
+                pid_swing_rev_per_cycle = float(self.parent.control_frame.r5_c1.get())
+            except Exception:
+                pid_swing_rev_per_cycle = 1.00
+                
+            self.comm.pid_experiment(pid_experiment_mode, pid_rotary_motor_speed_rpm, self.pid_target_load_lbf, pid_experiment_revolution_rev, pid_swing_rev_per_cycle)
         else:
             pass
 

@@ -249,6 +249,7 @@ class ControlFrame(ctk.CTkFrame):
         self.r5_c0 = ctk.CTkLabel(self.frame0, text='Rev Per Cycle:')
 
         self.r5_c1 = ctk.CTkEntry(self.frame0, justify="right", width=121)
+        self.r5_c1.bind("<KeyRelease>", lambda e: self.calculate_run_limit())
 
         # Row 6
         self.r6_c0 = ctk.CTkLabel(self.frame0, text='Run Limit Type:')
@@ -353,14 +354,26 @@ class ControlFrame(ctk.CTkFrame):
         if experiment_mode == "Swing":
             self.r5_c0.grid(row=5, column=0, sticky="w", padx=10, pady=2)
             self.r5_c1.grid(row=5, column=1, sticky="e", padx=10, pady=2)
+            self.r6_c1.set("Revolution")
+            self.r6_c1.configure(state="disabled")
+            self.r7_c1.delete(0, "end")
+            self.r9_c1.configure(text = "(CW: 0   CCW: 0)");
+            self.r7_c0.configure(text="Total Cycles:")
+            self.r7_c1.insert(0, "0")
+            self.r8_c0.configure(text="Duration (hh:mm:ss):")
+            self.r8_c1.configure(text="00:00:00")
         else:
             self.r5_c0.grid_remove()
             self.r5_c1.grid_remove()
+            self.r6_c1.configure(state="normal")
         
         self.calculate_run_limit()
 
     def on_run_limit_type_change(self, run_limit_type):
         self.r7_c1.delete(0, "end")
+        self.r9_c1.configure(text = "(CW: 0   CCW: 0)");
+        experiment_mode = self.r1_c1.get()
+
         if run_limit_type == "Time":
             self.r7_c0.configure(text="Duration (hh:mm:ss):")
             self.r7_c1.insert(0, "00:00:00")
@@ -368,10 +381,16 @@ class ControlFrame(ctk.CTkFrame):
             self.r8_c1.configure(text="0")
 
         elif run_limit_type == "Revolution":
-            self.r7_c0.configure(text="Total Rev:")
-            self.r7_c1.insert(0, "0")
-            self.r8_c0.configure(text="Duration (hh:mm:ss):")
-            self.r8_c1.configure(text="00:00:00")
+            if experiment_mode == "Swing":
+                self.r7_c0.configure(text="Total Cycles:")
+                self.r7_c1.insert(0, "0")
+                self.r8_c0.configure(text="Duration (hh:mm:ss):")
+                self.r8_c1.configure(text="00:00:00")
+            else :
+                self.r7_c0.configure(text="Total Rev:")
+                self.r7_c1.insert(0, "0")
+                self.r8_c0.configure(text="Duration (hh:mm:ss):")
+                self.r8_c1.configure(text="00:00:00")
     
     def calculate_run_limit(self):
         try:
@@ -393,7 +412,7 @@ class ControlFrame(ctk.CTkFrame):
                 hh, mm, ss = map(int, self.r7_c1.get().split(':'))
                 duration_s = (hh * 3600) + (mm * 60) + ss
                 total_rev = (duration_s / 60.0) * rotary_motor_speed_rpm
-                self.r8_c1.configure(text=f"{total_rev:.2f}")
+                self.r8_c1.configure(text=f"{total_rev:.1f}")
             
             import math
             total_rev = float(total_rev)
@@ -411,12 +430,15 @@ class ControlFrame(ctk.CTkFrame):
                 cw = math.floor(total_rev / 2)
                 ccw = total_rev - cw
             elif experiment_mode == "Swing":
-                ccw = math.floor(total_rev / 2)
-                cw  = total_rev - ccw
+                rev_per_cycle = float(self.r5_c1.get())
+                total_cycles = float(self.r7_c1.get())
+                if rev_per_cycle <= 0:
+                    rev_per_cycle = 1
+                cw = ccw = rev_per_cycle * total_cycles
             else:
                 cw, ccw = 0.0, 0.0
             
-            self.r9_c1.configure(text=f"(CW: {cw}   CCW: {ccw})")
+            self.r9_c1.configure(text=f"(CW: {cw:.1f}   CCW: {ccw:.1f})")
             
         except Exception:
             pass
@@ -457,6 +479,9 @@ class SurfaceFrame(ctk.CTkFrame):
         self.fig, self.ax = create_surface_plot()
         self.canvas_surface = FigureCanvasTkAgg(self.fig, master=self)
         self.canvas_surface.get_tk_widget().grid(row=1, column=0, sticky="nsew", padx=10, pady=(0,10))
+
+        self.r1_c0 = ctk.CTkLabel(self, text='This feature will be enabled in the next version.', text_color= "#FFFFFF", font=("Helvetica", 18), fg_color="#979da2")
+        self.r1_c0.grid(row=1, column=0, padx=10, pady=10) 
 
     def destroy_plot(self):
         try:
