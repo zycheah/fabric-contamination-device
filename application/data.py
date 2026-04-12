@@ -134,5 +134,10 @@ def default_data_map():
             "label": "Thermocouple Flow Temperature (°C)",
             "value": 0.0,
             "state": 0
+        },
+        "firmware_version":{
+            "label": "Firmware Version",
+            "value": "",
+            "state": 0
         }
     }

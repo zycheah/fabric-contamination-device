@@ -113,6 +113,12 @@ class PerformanceFrame(ctk.CTkFrame):
         self.r7_c1 = ctk.CTkLabel(self, text='0.00')
         self.r7_c1.grid(row=7, column=1, sticky="e", padx=10, pady=2)
 
+        self.r8_c0 = ctk.CTkLabel(self, text=parent.data["firmware_version"]["label"]+":")
+        self.r8_c0.grid(row=8, column=0, sticky="w", padx=10, pady=2)
+
+        self.r8_c1 = ctk.CTkLabel(self, text="")
+        self.r8_c1.grid(row=8, column=1, sticky="e", padx=10, pady=2)
+
     def open_advanced_performance(self):
         if self.parent.advanced_performance is None or not self.parent.advanced_performance.winfo_exists():
             self.parent.advanced_performance = AdvancedPerformance(self.parent)

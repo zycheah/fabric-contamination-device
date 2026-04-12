@@ -3,6 +3,7 @@ import requests
 import customtkinter as ctk
 from customtkinter import filedialog
 from diagnostics import register_log, diagnostics_path
+import subprocess
 
 class AdvancedPerformance(ctk.CTkToplevel):
     def __init__(self, parent):
@@ -265,8 +266,8 @@ class Firmware(ctk.CTkToplevel):
         self.r0_c0 = ctk.CTkLabel(master=self.frame0, text="Firmware Version:")
         self.r0_c0.grid(row=0, column=0, sticky="w", padx=10, pady=2)
 
-        from main import version, release_date
-        self.r0_c1 = ctk.CTkLabel(master=self.frame0, text=f"v{version} ({release_date})")
+        from main import app_version, release_date
+        self.r0_c1 = ctk.CTkLabel(master=self.frame0, text=f"v{app_version} ({release_date})")
         self.r0_c1.grid(row=0, column=1, sticky="e", padx=10, pady=2)
 
         self.r1_c0 = ctk.CTkLabel(master=self.frame0, text="Repository URL:")
@@ -286,6 +287,9 @@ class Firmware(ctk.CTkToplevel):
         self.refresh_button = ctk.CTkButton(master=self.frame0, text="↻", width=121, command=self.on_button_click)
         self.refresh_button.place(relx=1.0, rely=1.0, x=-20, y=-20, anchor="se")
 
+        self.firmware_button = ctk.CTkButton(master=self.frame0, text="Update Firmware", width=121, command=self.update_firmware)
+        self.firmware_button.place(relx=1.0, rely=1.0, x=-150, y=-20, anchor="se")
+
         self.update_status = None
         self.download_url = None
         self.check_for_updates()
@@ -297,21 +301,21 @@ class Firmware(ctk.CTkToplevel):
                 webbrowser.open_new(self.download_url)
                 self.status.configure(text="✅ Downloading...", text_color="green")
             else:
-                self.status.configure(text="❌ Error: Could not determine download link.", text_color="red")
+                self.status.configure(text="Error: Could not determine download link.", text_color="red")
         else:
             self.check_for_updates()
 
     def check_for_updates(self):
         if not self.check_internet_connection():
-            self.status.configure(text="⚠️ No Internet Connection! Please check your internet connection and try again.", text_color="red")
+            self.status.configure(text="No Internet Connection! Please check your internet connection and try again.", text_color="red")
             return
 
         self.refresh_button.configure(state="disabled")
-        self.status.configure(text="⏳ Checking for updates...\n\nPlease wait...", text_color="blue")
+        self.status.configure(text="Checking for updates...\n\nPlease wait...", text_color="blue")
         self.update()
 
         try:
-            from main import version
+            from main import app_version
             from packaging.version import Version
             from github import Github
 
@@ -319,7 +323,7 @@ class Firmware(ctk.CTkToplevel):
             release_tag = self.repo.get_latest_release().tag_name.lstrip("v")
             release_date = self.repo.get_latest_release().published_at.strftime("%m/%d/%Y")
             
-            if Version(release_tag) > Version(version):
+            if Version(release_tag) > Version(app_version):
                 self.update_status = "update_available"
                 self.refresh_button.configure(text="Install")
                 self.new_version_info(release_tag, release_date)
@@ -330,7 +334,7 @@ class Firmware(ctk.CTkToplevel):
                 self.status.configure(text="You are on the latest version.")
 
         except Exception:
-            self.status.configure(text=f"❌ Failed to reach GitHub. Please verify the Repository URL.", text_color="red")
+            self.status.configure(text=f"Failed to reach GitHub. Please verify the Repository URL.", text_color="red")
         
         finally:
             self.refresh_button.configure(state="normal")
@@ -375,6 +379,41 @@ class Firmware(ctk.CTkToplevel):
                     return asset.browser_download_url
 
         raise RuntimeError("No compatible installer found for your OS.")
+    
+    def update_firmware(self):
+        if not self.parent.sync.comm:
+            self.status.configure(text="No device detected. Please connect your controller via USB and try again.", text_color="red")
+            return
+        
+        import os
+        fqbn = "rp2040:rp2040:adafruit_feather_can"
+        sketch = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "controller")
+        port = self.parent.sync.comm._serial.port
+
+        self.status.configure(text="Compiling...\n\nPlease wait...", text_color="blue")
+        self.update()
+
+        compile_result = subprocess.run(
+            ["arduino-cli", "compile", "--fqbn", fqbn, sketch],
+            capture_output=True, text=True
+        )
+
+        if compile_result.returncode != 0:
+            self.status.configure(text=f"Compile failed:\n{compile_result.stderr}", text_color="red")
+            return
+
+        self.status.configure(text="Uploading...\n\nPlease wait...", text_color="blue")
+        self.update()
+
+        upload_result = subprocess.run(
+            ["arduino-cli", "upload", "-p", port, "--fqbn", fqbn, sketch],
+            capture_output=True, text=True
+        )
+
+        if upload_result.returncode == 0:
+            self.status.configure(text="✅ Firmware uploaded successfully!\n\nPlease click 'Connect' to reconnect to your controller.", text_color="green")
+        else:
+            self.status.configure(text=f"Upload failed:\n{upload_result.stderr}", text_color="red")
 
 class AdvancedControl(ctk.CTkToplevel):
     def __init__(self, parent):

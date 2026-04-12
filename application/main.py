@@ -4,7 +4,8 @@
 import customtkinter as ctk
 
 title = "Fabric Contamination Device"
-version = "0.0.0"
+app_version = "0.0.0"
+firmware_version = "1.0.0"
 release_date = "12/25/2025"
 
 # ================= SPLASH SCREEN =================
@@ -34,7 +35,7 @@ class SplashScreen:
         center_frame = ctk.CTkFrame(bg_frame, fg_color="transparent")
         center_frame.pack(expand=True)
 
-        app_name = ctk.CTkLabel(center_frame, text=title + " " + version, font=("Arial", 24, "bold"), text_color="white")
+        app_name = ctk.CTkLabel(center_frame, text=title + " " + app_version, font=("Arial", 24, "bold"), text_color="white")
         app_name.pack(pady=10)
 
         loading_text = ctk.CTkLabel(center_frame, text="Loading...", font=("Open Sans", 14), text_color="white")
@@ -85,7 +86,7 @@ class App(ctk.CTk):
         log("#001", "Application", "Application has been initialized.")
 
         # ========== APPLICATION SETUP =======
-        self.title(title + " " + version)
+        self.title(title + " " + app_version)
         self.geometry("1920x1080")
         self.bind("<1>", lambda event: event.widget.focus_set())
         self._state_before_windows_set_titlebar_color = 'zoomed'

@@ -24,7 +24,7 @@ class Comm:
 
         self._serial.write(struct.pack('<BB', 0xAA, 0x00))
         log("#603", "Application", "Connection request has been sent to the controller.")
-        
+
         cmd = self._serial.read(4)
         if cmd == b'\xCC\x00\x00\xEE':
             log("#604", "Controller", "Connection is successful.")
@@ -72,7 +72,7 @@ class Comm:
             elif hdr == b'\xDD':
                 data = self._serial.read_until(expected=b'\xEE').decode(errors='ignore').strip().split(',')
 
-                if len(data) != 27:
+                if len(data) != 28:
                     return None, None
 
                 data_map = {
@@ -102,7 +102,8 @@ class Comm:
                     "pid_overshoot_percent": float(data[23]),
                     "pid_settling_time_s": float(data[24]),
                     "pid_load_error_running_avg_percent": float(data[25]),
-                    "thermocouple_flow_temperature_c": float(data[26])
+                    "thermocouple_flow_temperature_c": float(data[26]),
+                    "firmware_version": data[27]
                 }
 
                 return hdr, data_map

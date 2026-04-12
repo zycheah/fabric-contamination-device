@@ -105,7 +105,7 @@ class Sync:
                     self.comm = Comm(port=port, baudrate=baudrate, timeout=timeout, frequency=frequency)
                     
                     self.comm.send_config(self.parent.config)
-                    
+
                     self.parent.settings_frame.r2_c1.configure(text="Connected")
 
                     def on_enter(event):
@@ -213,6 +213,15 @@ class Sync:
             for key, value in bfr.items():
                 if key in self.parent.data:
                     self.parent.data[key]["value"] = value
+        
+        try:
+            from main import firmware_version
+            from packaging.version import Version
+            controller_version = bfr.get("firmware_version", "")
+            if controller_version and Version(controller_version) < Version(firmware_version):
+                self.parent.settings_frame.r2_c1.configure(text="⚠️ Update Firmware")
+        except Exception:
+            pass
 
     def health(self):
         if self.comm:
@@ -263,6 +272,7 @@ class Sync:
             self.parent.performance_frame.r5_c1.configure(text=f"{self.parent.data['left_loadcell_load_lbf']['value']:.2f}")
             self.parent.performance_frame.r6_c1.configure(text=f"{self.parent.data['total_load_lbf']['value']:.2f}")
             self.parent.performance_frame.r7_c1.configure(text=f"{self.parent.data['thermocouple_flow_temperature_c']['value']:.2f}")
+            self.parent.performance_frame.r8_c1.configure(text=self.parent.data['firmware_version']['value'])
 
             if self.parent.advanced_performance is not None and self.parent.advanced_performance.winfo_exists():
                 for key, entry in self.parent.data.items():
