@@ -36,9 +36,6 @@ arduino-cli upload -p /dev/tty.usbmodem101 --fqbn rp2040:rp2040:adafruit_feather
 
 
 
-
-
-
 pyinstaller --noconfirm --onefile --console \
   --hidden-import=mplcyberpunk \
   --collect-all mplcyberpunk \
