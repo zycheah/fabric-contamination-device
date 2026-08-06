@@ -1,0 +1,692 @@
+\documentclass[12pt]{report}
+\usepackage[margin=1in,headheight=15pt]{geometry}
+\usepackage{setspace}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage[font=small,labelfont=bf,margin=0.5cm]{caption}
+\singlespacing
+
+% running header / footer
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Fabric Contamination Device (FCD)}
+\fancyhead[R]{User Manual}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+% chapter-opening pages reset to "plain" style by the report class; give
+% that style the same footer so page numbers never disappear
+\fancypagestyle{plain}{
+    \fancyhf{}
+    \fancyfoot[C]{\thepage}
+    \renewcommand{\headrulewidth}{0pt}
+}
+
+% clickable table of contents, cross-references, and PDF bookmarks/metadata
+\usepackage[
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=black,
+    urlcolor=blue!50!black,
+    bookmarksnumbered=true,
+    pdftitle={Fabric Contamination Device (FCD) User Manual},
+    pdfauthor={Mehmet B. Sefer and Zi Ying Cheah}
+]{hyperref}
+
+% Consistent "Default: ..." line used throughout the Advanced Settings section
+\newcommand{\defaultval}[1]{\noindent\textbf{Default:} #1\par\smallskip\noindent}
+
+% Consistent screenshot figure block used throughout the manual
+\newcommand{\screenshot}[4][\textwidth]{
+    \begin{figure}[H]
+        \centering
+        \includegraphics[
+            width=#1,
+            height=0.82\textheight,
+            keepaspectratio
+        ]{figures/#2}
+        \caption{#3}
+        \label{fig:#4}
+    \end{figure}
+}
+
+\begin{document}
+
+\title{\textbf{Fabric Contamination Device (FCD) \\ User Manual}}
+\author{Mehmet B. Sefer \& Zi Ying Cheah \thanks{This project led by Mehmet B. Sefer from December 2024 to April 2026
+with contributions of Mitchell Strobbe and Zi Ying Cheah. Ongoing efforts are led by Zi Ying Cheah since April 2026.}}
+
+% \date{}
+\maketitle
+
+\tableofcontents
+\listoffigures
+\newpage
+
+% ====== Introduction ======
+\chapter{Introduction}
+
+\section{Overview}
+The Fabric Contamination Device (FCD) is a laboratory instrument that runs repeated, controlled rotational and load-application cycles on a fabric sample. A rotary motor drives a roller that moves the sample, while two Z-axis motors, each paired with a load cell, press against the sample and hold a target contact load using closed-loop (PID) control. While a test runs, the device reports motor speed and position, applied load, and flow temperature back to a control computer.
+
+The FCD desktop application (this manual's subject) is the software that runs on that control computer. It connects to the device's controller over USB, lets you configure and start test runs (``experiments''), displays live performance data, and can record the results to a spreadsheet for later analysis.
+
+\section{About This Manual}
+This manual covers the FCD desktop application: installing it, connecting it to a controller, using every panel and setting in the interface, running a typical experiment, and troubleshooting common problems. It does not cover the device's mechanical assembly, wiring, or the controller board's electrical design -- those are documented separately.
+
+This manual is written for anyone operating the FCD software, whether running a routine test or configuring the device for the first time. No programming experience is required. Button, field, and window names in this manual match the on-screen labels exactly (for example, \textbf{Connect} or \textbf{Advanced Settings}), so you can follow along directly in the application.
+
+The application's installed version and the connected controller's firmware version are always available from \textbf{Settings} $\rightarrow$ \textbf{Firmware} inside the app; this manual does not assume a specific version number.
+
+\section{Safety and Regulatory Information}
+The FCD is a laboratory/research instrument, not a certified consumer product. Read this section before operating the device.
+
+\begin{itemize}
+    \item \textbf{Moving parts.} The rotary motor, both Z-axis motors, and the roller can move automatically at any time the device is connected and powered, including during calibration before an experiment visibly starts. Keep hands, hair, loose clothing, and tools clear of the rollers and motors during operation.
+    \item \textbf{Applied load.} The Z-axis motors can press the load cells against a sample with meaningful force (10\,lbf per side by default). Do not place fingers or sensitive equipment between the load cell contacts and the sample while the device is connected.
+    \item \textbf{Emergency stop.} The fastest way to stop all motion is the \textbf{Halt} button under \textbf{Advanced Control} $\rightarrow$ \textbf{Main Commands}. The device also halts itself automatically if a load cell exceeds its configured overload limit.
+    \item \textbf{Electrical safety.} Use a grounded power outlet for the controller and computer, and keep liquids away from both. Do not disconnect the USB cable while an experiment or a firmware update is in progress.
+    \item \textbf{Trained operators only.} Anyone operating the FCD should be familiar with this manual and with your lab's own equipment safety procedures before running the device unsupervised.
+    \item \textbf{Regulatory status.} The FCD is intended for internal research and development use. No consumer safety or EMC certification (e.g. UL, CE, FCC) is claimed for the assembled device.
+\end{itemize}
+
+% ====== Software ======
+\chapter{Software}
+
+\section{Software Overview}
+The FCD application is a Windows desktop program that controls the device over a USB serial connection to its controller board. It polls the controller for live status and telemetry on a fixed interval, displays that data across several panels in one main window, and sends commands back to the controller when you interact with the controls (connecting, jogging motors, starting an experiment, and so on).
+
+All configurable parameters (communication settings, motor speeds, PID gains, load-cell calibration, and more) are stored in a single \texttt{config.json} file on the computer. This file is re-sent to the controller every time you connect, so the controller always runs with the settings currently shown in \textbf{Advanced Settings}. Every noteworthy event -- connecting, disconnecting, sending a command, an error, an overload -- is written to a local diagnostics log that you can review from \textbf{Settings} $\rightarrow$ \textbf{Diagnostics}.
+
+From the \textbf{Firmware} window the application can also check GitHub for newer releases of both the desktop application and the controller firmware, and can update the controller directly over USB.
+
+\section{Main Interface}
+When the application opens, the main window fills the screen and is divided into six panels:
+
+\begin{itemize}
+    \item \textbf{Device Health} (top left) -- connection status and a busy/idle/overload indicator for each motor and load cell.
+    \item \textbf{Real-Time Performance} (middle left) -- the most commonly watched live measurements.
+    \item \textbf{Settings} (bottom left) -- device port selection, connection control, and access to Maintenance, Diagnostics, and Firmware.
+    \item \textbf{Device Control} (center, scrollable) -- experiment configuration, data acquisition setup, and experiment start/stop, all in one scrollable column.
+    \item \textbf{2D Surface Profile} (right) -- reserved for a future surface-mapping feature.
+    \item \textbf{Step Response (PID)} (bottom) -- a live chart of applied load versus time during calibration and experiments.
+\end{itemize}
+
+Every value shown on these panels updates automatically once the application is connected to a controller; nothing needs to be manually refreshed.
+
+\screenshot{main_overview.png}{The main application window and its six panels, shown disconnected with default values.}{main-interface}
+
+\section{Device Health}
+This panel shows whether the application is connected to a controller, and a live activity/fault indicator for each motor and load cell. When no controller is connected, every indicator reads ``Inactive'' and the top status reads ``Not Connected''.
+
+\screenshot[0.75\textwidth]{device_health.png}{The Device Health panel.}{device-health}
+
+\subsection{Rotary Motor Status}
+Reads \textbf{Idle} when the rotary motor's reported speed is zero, and \textbf{Busy} whenever it is turning.
+
+\subsection{Right Z-Axis Motor Status}
+Reads \textbf{Idle} when the right Z-axis motor's reported speed is zero, and \textbf{Busy} whenever it is moving.
+
+\subsection{Left Z-Axis Motor Status}
+Reads \textbf{Idle} when the left Z-axis motor's reported speed is zero, and \textbf{Busy} whenever it is moving.
+
+\subsection{Right Load Cell Status}
+Reads \textbf{Active} while the right load cell's measured load is within its configured maximum, and \textbf{Overload} if that limit is exceeded (the maximum is set by \texttt{right\_loadcell\_max\_load\_lbf} in Advanced Settings; the device also halts motors automatically when this happens).
+
+\subsection{Left Load Cell Status}
+Reads \textbf{Active} while the left load cell's measured load is within its configured maximum, and \textbf{Overload} if that limit is exceeded (the maximum is set by \texttt{left\_loadcell\_max\_load\_lbf} in Advanced Settings; the device also halts motors automatically when this happens).
+
+\newpage
+\section{Real-time Performance}
+This panel shows the seven measurements you're most likely to watch while a test runs. Click \textbf{Advanced Performance} in the top-right of this panel to open a separate window with every raw channel the controller reports.
+
+\screenshot[0.75\textwidth]{real_time_performance.png}{The Real-Time Performance panel.}{real-time-performance}
+
+\subsection{Rotary Motor Speed (RPM)}
+The rotary motor's current rotational speed, in revolutions per minute.
+
+\subsection{Rotary Motor Position (deg)}
+The rotary motor's current angular position, in degrees.
+
+\subsection{Passive Roller Position (in)}
+The passive roller's current linear position, in inches.
+
+\subsection{Right Load Cell Load (lbf)}
+The load currently measured by the right load cell, in pounds-force.
+
+\subsection{Left Load Cell Load (lbf)}
+The load currently measured by the left load cell, in pounds-force.
+
+\subsection{Total Load (lbf)}
+The combined load from both load cells, in pounds-force. This is the value plotted on the Step Response (PID) chart and used as the PID controller's feedback signal.
+
+\subsection{Thermocouple Flow Temperature (\textdegree C)}
+The temperature reported by the device's thermocouple, in degrees Celsius.
+
+\newpage
+\section{Advanced Performance}
+This window (opened from \textbf{Real-Time Performance} $\rightarrow$ \textbf{Advanced Performance}) lists every telemetry channel the controller reports, updated live. It's mainly useful for detailed monitoring and troubleshooting, since it includes raw values (steps, ADC counts, volts) alongside their converted, human-readable equivalents.
+
+\screenshot{advanced_performance.png}{The Advanced Performance window.}{advanced-performance}
+
+\subsection{Rotary Motor Speed (step/s)}
+The rotary motor's speed in raw motor steps per second.
+
+\subsection{Rotary Motor Speed (RPM)}
+The rotary motor's speed converted to revolutions per minute.
+
+\subsection{Rotary Motor Position (deg)}
+The rotary motor's angular position in degrees.
+
+\subsection{Right Z-Axis Motor Speed (step/s)}
+The right Z-axis motor's speed in raw motor steps per second.
+
+\subsection{Right Z-Axis Motor Speed (rpm)}
+The right Z-axis motor's speed converted to revolutions per minute.
+
+\subsection{Right Z-Axis Motor Position (step)}
+The right Z-axis motor's position in raw motor steps, relative to its home position.
+
+\subsection{Right Z-Axis Motor Position (in)}
+The right Z-axis motor's position converted to inches, relative to its home position.
+
+\subsection{Left Z-Axis Motor Speed (step/s)}
+The left Z-axis motor's speed in raw motor steps per second.
+
+\subsection{Left Z-Axis Motor Speed (rpm)}
+The left Z-axis motor's speed converted to revolutions per minute.
+
+\subsection{Left Z-Axis Motor Position (step)}
+The left Z-axis motor's position in raw motor steps, relative to its home position.
+
+\subsection{Left Z-Axis Motor Position (in)}
+The left Z-axis motor's position converted to inches, relative to its home position.
+
+\subsection{Passive Roller Position (step)}
+The passive roller's position in raw motor steps.
+
+\subsection{Passive Roller Position (in)}
+The passive roller's position converted to inches.
+
+\subsection{Right Load Cell ADC (16-bit)}
+The right load cell's raw 16-bit analog-to-digital converter reading, before any conversion or calibration is applied.
+
+\subsection{Right Load Cell Volts (V)}
+The right load cell's signal converted to volts.
+
+\subsection{Right Load Cell Load (lbf)}
+The right load cell's signal converted to pounds-force, using its zero offset and scale factor from Advanced Settings.
+
+\subsection{Left Load Cell ADC (16-bit)}
+The left load cell's raw 16-bit analog-to-digital converter reading, before any conversion or calibration is applied.
+
+\subsection{Left Load Cell Volts (V)}
+The left load cell's signal converted to volts.
+
+\subsection{Left Load Cell Load (lbf)}
+The left load cell's signal converted to pounds-force, using its zero offset and scale factor from Advanced Settings.
+
+\subsection{Total Load (lbf)}
+The right and left load cell readings combined, in pounds-force.
+
+\subsection{Total Revolution (rev)}
+The cumulative number of revolutions completed by the rotary motor during the current or most recent experiment.
+
+\subsection{Thermocouple Flow Temperature (\textdegree C)}
+The temperature reported by the device's thermocouple, in degrees Celsius.
+
+\newpage
+\section{Settings}
+This panel controls which device the application talks to, and gives access to three secondary windows: Maintenance, Diagnostics, and Firmware.
+
+\screenshot[0.75\textwidth]{settings.png}{The Settings panel.}{settings}
+
+\subsection{Select Device Port}
+A drop-down list of the serial (COM) ports currently available on your computer. The list refreshes automatically as USB devices are plugged in or removed -- you do not need to reopen the application. Select the port your FCD controller is connected to before clicking Connect.
+
+\subsection{Connection}
+The \textbf{Connect} button opens a serial connection to the selected port and sends it the current configuration from \texttt{config.json}. Once connected, the button reads \textbf{Connected}; hover over it to see it change to \textbf{Disconnect}, and click it again to close the connection. If the connection attempt fails, the button simply remains \textbf{Connect} -- check \textbf{Diagnostics} for the reason.
+
+\subsection{Maintenance}
+Click \textbf{Launch} to open a small window intended to track the device's cumulative Total Run Time and Total Rev for maintenance planning. In the current release these fields are placeholders and are not yet populated from live device data.
+
+\screenshot[0.75\textwidth]{maintenance.png}{The Maintenance window.}{maintenance}
+
+\subsection{Diagnostics}
+Click \textbf{Launch} to open a scrolling log of every event the application and controller have reported this session, each with a date/time stamp, a numeric ID, a source (\textit{Application} or \textit{Controller}), and a message. This is the first place to look when something doesn't behave as expected -- see Chapter~\ref{ch:troubleshooting}, Troubleshooting, for a full list of log codes.
+
+\screenshot{diagnostics.png}{The Diagnostics window.}{diagnostics}
+
+\subsection{Firmware}
+Click \textbf{Check} to open a window showing the installed application version, the connected controller's firmware version (blank until connected), and a \textbf{Repository URL} field (defaulted to the project's GitHub repository) used to check for updates. On open, it automatically checks GitHub for a newer application release; if one exists, the refresh button changes to \textbf{Install} and clicking it opens the correct installer download for your operating system in your browser. The \textbf{Update Controller} button compiles and uploads the controller firmware bundled with the application directly to a connected controller over USB -- use it when prompted to update an out-of-date controller.
+
+\screenshot[0.75\textwidth]{firmware.png}{The Firmware window, showing an available application update.}{firmware}
+
+\newpage
+\section{Advanced Settings}
+Click \textbf{Advanced Settings} in the top-right of the Settings panel to open every configurable parameter from \texttt{config.json} in one scrollable list. Each field can be edited directly. Use \textbf{Configure} to save your changes back to \texttt{config.json} (they take effect the next time you connect), \textbf{Save As} to export the current values to a new file, and \textbf{Load} to import values from a previously saved file. Changing these values incorrectly can affect motor motion and load accuracy, so change them only if you understand what the parameter controls.
+
+\screenshot{advanced_settings.png}{The Advanced Settings window (top of the scrollable list).}{advanced-settings}
+
+\subsection{sync\_frequency}
+\defaultval{1000\,ms}
+How often the application refreshes its connection to available serial ports and re-checks device health in the background.
+
+\subsection{comm\_baudrate}
+\defaultval{115200}
+The serial baud rate used for USB communication between the application and the controller. Must match the rate the controller firmware expects.
+
+\subsection{comm\_timeout}
+\defaultval{1\,s}
+How long the application waits for a response from the controller before treating a read as timed out.
+
+\subsection{comm\_frequency}
+\defaultval{100\,ms}
+How often the application polls the controller for new status and telemetry data once connected.
+
+\subsection{manual\_rotary\_motor\_speed\_rpm}
+\defaultval{5\,rpm}
+The speed used when jogging the rotary motor manually from Advanced Control.
+
+\subsection{manual\_rotary\_motor\_ramplen\_step}
+\defaultval{20\,step}
+The acceleration/deceleration ramp length, in motor steps, applied to manual rotary motor moves.
+
+\subsection{manual\_z\_axis\_motor\_speed\_rpm}
+\defaultval{50\,rpm}
+The speed used when jogging either Z-axis motor manually from Advanced Control.
+
+\subsection{manual\_z\_axis\_motor\_ramplen\_step}
+\defaultval{5\,step}
+The acceleration/deceleration ramp length, in motor steps, applied to manual Z-axis motor moves.
+
+\subsection{pid\_rotary\_motor\_ramplen\_step}
+\defaultval{20\,step}
+The acceleration/deceleration ramp length, in motor steps, applied to the rotary motor during an experiment.
+
+\subsection{pid\_z\_axis\_motor\_max\_speed\_rpm}
+\defaultval{50\,rpm}
+The maximum speed either Z-axis motor is allowed to reach while the PID loop is actively regulating load during an experiment.
+
+\subsection{pid\_z\_axis\_motor\_ramplen\_step}
+\defaultval{5\,step}
+The acceleration/deceleration ramp length, in motor steps, applied to the Z-axis motors during an experiment.
+
+\subsection{pid\_calibration\_limit\_time\_ms}
+\defaultval{20000\,ms}
+The maximum time allowed for the device to reach and stabilize at the target load before an experiment begins. If calibration doesn't succeed within this time, the run is automatically terminated and retried.
+
+\subsection{pid\_calibration\_mode}
+\defaultval{0}
+Selects which pre-run calibration routine the controller firmware uses to bring the load cells up to the target load before an experiment starts.
+
+\subsection{pid\_calibration\_stable\_required\_time\_ms}
+\defaultval{3000\,ms}
+How long the measured load must stay within tolerance of the target load, continuously, before calibration is considered complete.
+
+\subsection{pid\_calibration\_stable\_required\_count}
+\defaultval{5}
+The number of consecutive stable readings required (in addition to the stable-time requirement) before calibration is considered complete.
+
+\subsection{pid\_calibration\_load\_error\_percent}
+\defaultval{5\%}
+The allowed error, as a percentage of the target load, for a reading to count as ``stable'' during calibration.
+
+\subsection{pid\_tuning\_mode\_limit\_percent}
+\defaultval{10\%}
+The load-error threshold, as a percentage of the target load, that determines whether the controller uses the Conservative or Aggressive PID gain set. The active mode is shown on the Step Response (PID) chart.
+
+\subsection{pid\_conservative\_k\_p}
+\defaultval{21}
+The proportional gain used by the Conservative PID tuning mode.
+
+\subsection{pid\_conservative\_k\_i}
+\defaultval{0}
+The integral gain used by the Conservative PID tuning mode.
+
+\subsection{pid\_conservative\_k\_d}
+\defaultval{0.1}
+The derivative gain used by the Conservative PID tuning mode.
+
+\subsection{pid\_aggressive\_k\_p}
+\defaultval{21}
+The proportional gain used by the Aggressive PID tuning mode.
+
+\subsection{pid\_aggressive\_k\_i}
+\defaultval{0}
+The integral gain used by the Aggressive PID tuning mode.
+
+\subsection{pid\_aggressive\_k\_d}
+\defaultval{0.1}
+The derivative gain used by the Aggressive PID tuning mode.
+
+\subsection{go\_home\_z\_axis\_motors\_bounce\_step}
+\defaultval{-2000\,step}
+The small reverse move, in motor steps, that each Z-axis motor makes after reaching its home switch, to relieve mechanical pressure at the home position.
+
+\subsection{right\_loadcell\_zero\_offset\_lbf}
+\defaultval{0.16\,lbf}
+The baseline (tare) offset subtracted from the right load cell's raw reading so that ``no load'' reads as zero.
+
+\subsection{right\_loadcell\_calibration\_offset\_lbf}
+\defaultval{1.21\,lbf}
+The offset applied to the right load cell during calibration against a known reference load.
+
+\subsection{right\_loadcell\_scale\_factor}
+\defaultval{6.0606}
+The scale factor used to convert the right load cell's voltage reading into pounds-force.
+
+\subsection{right\_loadcell\_max\_load\_lbf}
+\defaultval{10\,lbf}
+The overload threshold for the right load cell. Exceeding this value sets Right Load Cell Status to Overload and halts the motors.
+
+\subsection{left\_loadcell\_zero\_offset\_lbf}
+\defaultval{0.16\,lbf}
+The baseline (tare) offset subtracted from the left load cell's raw reading so that ``no load'' reads as zero.
+
+\subsection{left\_loadcell\_calibration\_offset\_lbf}
+\defaultval{1.21\,lbf}
+The offset applied to the left load cell during calibration against a known reference load.
+
+\subsection{left\_loadcell\_scale\_factor}
+\defaultval{6.0606}
+The scale factor used to convert the left load cell's voltage reading into pounds-force.
+
+\subsection{left\_loadcell\_max\_load\_lbf}
+\defaultval{10\,lbf}
+The overload threshold for the left load cell. Exceeding this value sets Left Load Cell Status to Overload and halts the motors.
+
+\newpage
+\section{Device Control}
+This is the main panel for configuring and describing an experiment before you start it, found in the center column of the main window.
+
+\screenshot[0.75\textwidth]{device_control.png}{The Device Control panel, including Data Acquisition and Experiment Status.}{device-control}
+
+\subsection{Rotary Motor Speed (RPM)}
+The speed the rotary motor runs at during the experiment, in revolutions per minute. Changing this also updates the automatically calculated Total Rev / Duration values below it.
+
+\subsection{Apply Load}
+A \textbf{No}/\textbf{Yes} toggle. Set to \textbf{Yes} to enable the Target Load field and have the controller actively regulate (via PID) the contact load to that target throughout the run, including a short calibration phase before the run starts. Leave on \textbf{No} to run the rotary motion only, with no load target.
+
+\subsection{Target Load (lbf)}
+The load, in pounds-force, the PID controller tries to hold throughout the experiment. Only editable when Apply Load is set to Yes.
+
+\subsection{Rev Per Cycle}
+Only shown when Experiment Mode is set to Swing. The number of revolutions the roller travels in each direction before reversing, once per cycle.
+
+\subsection{Run Limit Type}
+Chooses whether you specify the experiment length as a \textbf{Time} duration or a \textbf{Revolution} count. Switching this also swaps which of the two fields below is the value you enter and which is automatically calculated. (This is locked to Revolution and disabled automatically when Experiment Mode is set to Swing.)
+
+\subsection{Duration (hh:mm:ss)}
+When Run Limit Type is Time, this is the length of the experiment you enter directly. When Run Limit Type is Revolution, this field instead shows the duration the application calculates from your chosen speed and revolution count.
+
+\subsection{Total Rev}
+When Run Limit Type is Revolution, this is the total number of revolutions you enter directly (labeled Total Cycles in Swing mode). When Run Limit Type is Time, this field instead shows the total revolutions the application calculates from your chosen speed and duration. Underneath it, a small ``(CW: \# \ \ CCW: \#)'' line shows how that total splits between clockwise and counter-clockwise motion for the selected Experiment Mode.
+
+\section{Experiment Mode}
+Selects the direction pattern the rotary motor follows during the experiment.
+
+\subsection{CW}
+Runs the full revolution count in the clockwise direction only.
+
+\subsection{CCW}
+Runs the full revolution count in the counter-clockwise direction only.
+
+\subsection{CW+CCW}
+Splits the total revolutions between clockwise and counter-clockwise motion within a single run, clockwise first. See the CW/CCW breakdown beneath the Total Rev field for the exact split.
+
+\subsection{CCW+CW}
+Splits the total revolutions between counter-clockwise and clockwise motion within a single run, counter-clockwise first. See the CW/CCW breakdown beneath the Total Rev field for the exact split.
+
+\subsection{Swing}
+Alternates direction repeatedly: the roller moves Rev Per Cycle revolutions one way, then the same number back, and repeats for the configured Total Cycles. Run Limit Type is fixed to Revolution while this mode is selected.
+
+\newpage
+\section{Advanced Control}
+Click \textbf{Advanced Control} in the top-right of the Device Control panel to open manual motor commands and low-level jog controls, independent of the Device Control experiment settings.
+
+\screenshot[0.75\textwidth]{advanced_control.png}{The Advanced Control window.}{advanced-control}
+
+\subsection{Main Commands}
+\begin{itemize}
+    \item \textbf{Halt} -- immediately stops all motors and cancels any active calibration or experiment. This is the device's emergency stop.
+    \item \textbf{Rotate Rotary Motor ($\circlearrowright$ 90-deg)} -- jogs the rotary motor 90 degrees.
+    \item \textbf{Return Rotary Motor to Home (Go Home)} -- moves the rotary motor back to its home position.
+    \item \textbf{Return Z-Axis Motors to Home (Go Home)} -- moves both Z-axis motors back to their home positions.
+\end{itemize}
+
+\subsection{Move Motors By}
+Moves each motor a relative distance from its current position. Choose the unit (\textbf{step} or \textbf{in}; the rotary motor is always entered in degrees), enter values for the Rotary Motor, Right Z-Axis Motor, and Left Z-Axis Motor, then click \textbf{Run}. Leave a field blank or at zero to leave that motor unmoved.
+
+\subsection{Move Motors To}
+Moves each motor to an absolute position, using the same unit toggle and fields as Move Motors By, then click \textbf{Run}.
+
+\subsection{Set Motors Home}
+\textbf{Set Home} buttons for the Rotary Motor, Right Z-Axis Motor, and Left Z-Axis Motor. Each button defines the motor's current physical position as its new home (zero) reference; it does not move the motor.
+
+\newpage
+\section{Data Acquisition}
+Also on the Device Control panel, this section controls whether -- and how -- experiment data is recorded to a file. Set the \textbf{Enable}/\textbf{Disable} toggle at the top of this section to \textbf{Enable} to unlock the fields below.
+
+\subsection{Data Frequency (ms)}
+How often, in milliseconds, a new row of data is written to the output file while an experiment is running.
+
+\subsection{Variable Selection}
+Click this button to open a window listing every telemetry channel (the same set shown in Advanced Performance) as an on/off switch. Only the switched-on variables are included as columns in the exported spreadsheet. The button's label always shows how many variables are currently selected (e.g. ``5 Selected'').
+
+\screenshot{variable_selection.png}{The Variable Selection window.}{variable-selection}
+
+\subsection{Experiment Name}
+The file name used for the exported results. If you don't type a \texttt{.xlsx} extension, it is added automatically.
+
+\subsection{Save to}
+Click \textbf{Browse} to choose the folder the results file will be saved into. No file is created until a folder has been chosen, Data Acquisition is enabled, and the experiment has been started.
+
+\newpage
+\section{Experiment Status}
+The \textbf{Start}/\textbf{Stop} control at the bottom of the Device Control panel begins or ends an experiment using the settings configured above it. \textbf{Start} sends the configured run to the controller; \textbf{Stop} sends a termination command and ends the run immediately.
+
+\subsection{Run Time (hh:mm:ss)}
+A live estimate of elapsed run time, calculated from the total revolutions completed so far and the configured rotary motor speed. It resets to 00:00:00 when no experiment is running.
+
+\subsection{Total Running Rev}
+The live, cumulative revolution count reported by the controller for the current run.
+
+\newpage
+\section{Step Response (PID)}
+This chart, shown at the bottom of the main window, plots Total Load (lbf) against elapsed time in real time. It appears automatically during the pre-run load calibration phase and continues throughout the experiment whenever Apply Load is set to Yes, with a red horizontal line marking the Target Load. The chart's axes rescale automatically as new data arrives, and the current PID tuning mode (Conservative or Aggressive) is labeled in the top-right corner of the plot.
+
+\screenshot{pid_frame.png}{The Step Response (PID) chart, shown before any data has been recorded.}{pid-frame}
+
+\section{PID Control}
+Click \textbf{PID Results} above the Step Response (PID) chart to open a window summarizing how well the load calibration performed. It opens automatically the first time calibration begins for a run with a nonzero Target Load.
+
+\screenshot[0.75\textwidth]{pid_results.png}{The PID Results window.}{pid-results}
+
+\subsection{PID Overshoot (lbf)}
+The peak amount by which the measured load exceeded the target load during calibration, in pounds-force.
+
+\subsection{PID Overshoot (\%)}
+The same overshoot expressed as a percentage of the target load.
+
+\subsection{PID Settling Time (s)}
+The time, in seconds, it took the measured load to settle within tolerance of the target load.
+
+\subsection{PID Load Error Running Average (\%)}
+A running average of the percentage error between the measured and target load, giving a sense of longer-term load stability.
+
+\newpage
+\section{2D Surface Profile}
+This panel, on the right side of the main window, is reserved for a future feature that will visualize the fabric sample's surface. It is not yet functional -- the panel displays an empty plot area overlaid with the message ``This feature will be enabled in the next version.''
+
+\screenshot[0.75\textwidth]{surface_frame.png}{The 2D Surface Profile panel in its current, not-yet-functional state.}{surface-frame}
+
+% ====== Installation and Setup ======
+\chapter{Installation and Setup}
+This chapter covers installing the FCD application on a Windows computer. It does not cover setting up the physical device itself.
+
+\section{Installing the Application}
+\begin{enumerate}
+    \item Go to the FCD GitHub repository's Releases page (the same address shown as \textbf{Repository URL} in the app's Firmware window: \\ \texttt{https://github.com/zycheah/fcd-gui-tests/releases}).
+    \item Download the latest installer built for Windows.
+    \item Run the downloaded installer. If Windows SmartScreen shows a warning because the publisher isn't recognized, select \textbf{More info}, then \textbf{Run anyway} to continue.
+    \item Follow the setup wizard, accepting the default install location, and finish the installation.
+    \item Launch \textbf{FCD} from the Start Menu or the desktop shortcut the installer creates.
+\end{enumerate}
+You can confirm which version was installed at any time from \textbf{Settings} $\rightarrow$ \textbf{Firmware} inside the application.
+
+% ====== Operation Guide ======
+\chapter{Operation Guide}
+This chapter walks through everyday use of the application, from first launch to a complete experiment.
+
+\section{Launching the Application}
+Double-click the FCD icon (Start Menu or desktop shortcut). A brief loading splash screen appears for a couple of seconds, after which the main window opens, maximized. At this point the application is not yet connected to a controller: Device Health reads ``Not Connected'', and every performance value reads 0.00.
+
+\section{Connecting to Controller}
+\label{sec:connecting}
+\begin{enumerate}
+    \item Connect the controller to your computer with a USB cable. If it doesn't appear in \textbf{Select Device Port} within a few seconds, check Windows Device Manager to confirm the port driver installed correctly, then reselect it in the dropdown.
+    \item Choose the correct port from \textbf{Select Device Port}.
+    \item Click \textbf{Connect}.
+\end{enumerate}
+On a successful connection, the button changes to \textbf{Connected} (hover over it to see it change to \textbf{Disconnect}), the current \texttt{config.json} settings are sent to the controller, and Device Health switches to ``Connected''. If the connected controller's firmware is older than the installed application version, an \textbf{Update Controller Version} warning window opens automatically -- see \textbf{Settings} $\rightarrow$ \textbf{Firmware} to update it before running an experiment. If the connection fails, the button remains \textbf{Connect}; open \textbf{Diagnostics} to see why.
+
+\section{First Run Procedure}
+Before running a real experiment on a newly set up or reconfigured device:
+\begin{enumerate}
+    \item Connect to the controller as described above.
+    \item Open \textbf{Settings} $\rightarrow$ \textbf{Firmware} and confirm the application and controller versions are compatible, updating the controller if prompted.
+    \item Open \textbf{Advanced Settings} and confirm the load-cell zero offset, scale factor, and max-load values match your current calibration.
+    \item With no sample under load, use \textbf{Advanced Control} to jog each motor manually and confirm it moves as expected, then use \textbf{Set Motors Home} to define the current position as the reference point for the run.
+    \item Run one short, low-speed test cycle without Apply Load enabled to confirm the device responds correctly before running a full experiment with load applied.
+\end{enumerate}
+
+\section{Basic Usage Workflow}
+A typical experiment follows this sequence:
+\begin{enumerate}
+    \item Connect to the controller (Section~\ref{sec:connecting}).
+    \item In \textbf{Device Control}, choose an \textbf{Experiment Mode}, set the \textbf{Rotary Motor Speed}, and optionally enable \textbf{Apply Load} with a \textbf{Target Load}.
+    \item Choose a \textbf{Run Limit Type} and set the resulting Duration or Total Rev field.
+    \item If you want the results recorded, enable \textbf{Data Acquisition}: set the Data Frequency, choose which variables to record under \textbf{Variable Selection}, name the experiment, and choose a folder under \textbf{Save to}.
+    \item Set \textbf{Experiment Status} to \textbf{Start}.
+    \item Watch progress on \textbf{Device Health}, \textbf{Real-Time Performance}, \textbf{Experiment Status}, and the \textbf{Step Response (PID)} chart while the run is in progress.
+    \item Let the run finish automatically at the configured limit, or set \textbf{Experiment Status} to \textbf{Stop} to end it early.
+    \item If Data Acquisition was enabled, find the recorded spreadsheet in the folder you chose.
+\end{enumerate}
+
+% ====== Troubleshooting ======
+\chapter{Troubleshooting}
+\label{ch:troubleshooting}
+
+\section{Common Issues}
+Whenever something doesn't behave as expected, the first place to look is \textbf{Settings} $\rightarrow$ \textbf{Diagnostics}. It shows a timestamped log of every event the application and controller have reported this session, each with a numeric ID you can look up in Table~\ref{tab:diagnostics} below.
+
+\section{Connection Problems}
+\begin{itemize}
+    \item \textbf{No ports appear in Select Device Port.} Confirm the USB cable is plugged in at both ends and that the controller is powered. Check Windows Device Manager to confirm a serial port was created.
+    \item \textbf{Connect does nothing, or the button never changes to Connected.} Open Diagnostics and look for codes \#601--\#605; these describe why the serial connection or the initial handshake with the controller failed.
+    \item \textbf{The device disconnects on its own during use.} This usually means the port disappeared (codes \#501--\#503) -- check the USB cable and connector for a loose fit.
+    \item \textbf{Multiple ports are listed and you're not sure which is correct.} Unplug the controller, note which port disappears from the list, then reconnect and select that one.
+\end{itemize}
+
+\section{Sensor Errors}
+\begin{itemize}
+    \item \textbf{A load cell status reads Overload.} The measured load has exceeded that cell's configured maximum (\texttt{right\_loadcell\_max\_load\_lbf} / \texttt{left\_loadcell\_max\_load\_lbf} in Advanced Settings). The motors halt automatically (code \#534). Remove the load and confirm the maximum is set correctly for your test before resuming.
+    \item \textbf{A load cell always reads 0.00.} Check its zero offset and scale factor in Advanced Settings, and confirm the correct configuration was sent to the controller (reconnect to resend it).
+    \item \textbf{Performance values look frozen or missing.} The application discards any telemetry frame from the controller that isn't formatted correctly, so a display can occasionally miss an update; if it persists, disconnect and reconnect.
+\end{itemize}
+
+\section{Recovery Procedures}
+\begin{itemize}
+    \item \textbf{Stop all motion immediately.} Use \textbf{Halt} under \textbf{Advanced Control} $\rightarrow$ \textbf{Main Commands}.
+    \item \textbf{After an automatic overload halt.} Remove the load causing the overload, confirm the configured max-load values are correct, then reconnect before starting another run.
+    \item \textbf{After a firmware update.} Click \textbf{Connect} again to re-establish communication with the updated controller.
+    \item \textbf{Settings appear incorrect after manual edits.} Use \textbf{Load} in Advanced Settings to restore a previously saved, known-good configuration file, then click \textbf{Configure} to apply it.
+    \item \textbf{The application becomes unresponsive.} Close and relaunch it; no experiment configuration is lost, since Advanced Settings are stored in \texttt{config.json} on disk.
+\end{itemize}
+
+{\small
+\begin{longtable}{|l|l|p{9cm}|}
+\caption{Diagnostics log reference} \label{tab:diagnostics} \\
+\hline
+\textbf{ID} & \textbf{Source} & \textbf{Message} \\
+\hline
+\endfirsthead
+\hline
+\textbf{ID} & \textbf{Source} & \textbf{Message} \\
+\hline
+\endhead
+\#001 & Application & Application has been initialized. \\
+\#002 & Application & Configuration file has been accessed. \\
+\#003 & Application & Configuration file cannot be accessed. \\
+\#501 & Application & Port has disappeared. \\
+\#502 & Application & Port is not accessible. \\
+\#503 & Application & Serial cannot be terminated. \\
+\#504 & Controller & Motors have been halted. \\
+\#505 & Controller & Rotary Motor has been rotated by 90-deg. \\
+\#506 & Controller & Rotary Motor has been sent to home. \\
+\#507 & Controller & Z-Axis Motors have been sent to home. \\
+\#508 & Controller & Motors have been moved by the given distance. \\
+\#509 & Controller & Wrong size of degree unit received to move Rotary Motor by. \\
+\#510 & Controller & Wrong size of step unit received to move Right Z-Axis Motor by. \\
+\#511 & Controller & Wrong size of step unit received to move Left Z-Axis Motor by. \\
+\#512 & Controller & Wrong size of in unit received to move Right Z-Axis Motor by. \\
+\#513 & Controller & Wrong size of in unit received to move Left Z-Axis Motor by. \\
+\#514 & Controller & Wrong unit type received to move Z-Axis Motors by. \\
+\#515 & Controller & Motors have been moved to the given position. \\
+\#516 & Controller & Wrong size of degree unit received to move Rotary Motor to. \\
+\#517 & Controller & Wrong size of step unit received to move Right Z-Axis Motor to. \\
+\#518 & Controller & Wrong size of step unit received to move Left Z-Axis Motor to. \\
+\#519 & Controller & Wrong size of in unit received to move Right Z-Axis Motor to. \\
+\#520 & Controller & Wrong size of in unit received to move Left Z-Axis Motor to. \\
+\#521 & Controller & Wrong unit type received to move Z-Axis Motors to. \\
+\#522 & Controller & Rotary Motor position has been set to home. \\
+\#523 & Controller & Right Z-Axis Motor position has been set to home. \\
+\#524 & Controller & Left Z-Axis Motor position has been set to home. \\
+\#525 & Controller & Experiment has been initiated. \\
+\#526 & Controller & Wrong size of Rotary Motor Speed received for experiment. \\
+\#527 & Controller & Wrong size of Target Load received for experiment. \\
+\#528 & Controller & Wrong size of Experiment Duration received for experiment. \\
+\#529 & Controller & Device calibration has been initiated for target load. \\
+\#530 & Controller & Device has been calibrated successfully for target load. \\
+\#531 & Controller & Experiment has been started. \\
+\#532 & Controller & Experiment has been completed successfully. \\
+\#533 & Controller & Experiment has been terminated. \\
+\#534 & Controller & Motors have been halted due to overload protection. \\
+\#601 & Application & Serial has been initialized. \\
+\#602 & Application & Serial cannot be initialized. \\
+\#603 & Application & Connection request has been sent to the controller. \\
+\#604 & Controller & Connection is successful. \\
+\#605 & Application & Connection is not successful. \\
+\#606 & Application & Configuration file has been sent to the controller. \\
+\#607 & Controller & Configuration file has been received. \\
+\#608 & Controller & Configuration file cannot be read. \\
+\#609 & Controller & Configuration file is overflowed. \\
+\#610 & Application & Configuration file cannot be received. \\
+\#611 & Application & Disconnection request has been sent to the controller. \\
+\#612 & Controller & Controller has been disconnected, serial has been terminated. \\
+\#614 & Application & Command sent to the controller to halt motors. \\
+\#615 & Application & Command sent to the controller to rotate the Rotary Motor by 90-deg. \\
+\#616 & Application & Command sent to the controller to send the Rotary Motor to home. \\
+\#617 & Application & Command sent to the controller to send the Z-Axis Motors to home. \\
+\#618 & Application & Command sent to the controller to move motors by a given distance (step). \\
+\#619 & Application & Command sent to the controller to move motors by a given distance (in). \\
+\#620 & Application & Command sent to the controller to move motors to a given position (step). \\
+\#621 & Application & Command sent to the controller to move motors to a given position (in). \\
+\#622 & Application & Command sent to the controller to set the Rotary Motor home. \\
+\#623 & Application & Command sent to the controller to set the Right Z-Axis Motor home. \\
+\#624 & Application & Command sent to the controller to set the Left Z-Axis Motor home. \\
+\#625 & Application & Command sent to the controller to initiate an experiment (CW). \\
+\#626 & Application & Command sent to the controller to initiate an experiment (CCW). \\
+\#627 & Application & Command sent to the controller to initiate an experiment (CW+CCW). \\
+\#628 & Application & Command sent to the controller to initiate an experiment (CCW+CW). \\
+\#629 & Application & Command sent to the controller to initiate an experiment (Swing). \\
+\#630 & Application & Command sent to the controller to terminate the experiment. \\
+\hline
+\end{longtable}
+}
+
+\end{document}

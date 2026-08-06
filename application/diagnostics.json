@@ -1,7 +1,2 @@
-{"datetime": "2026-04-12 13:36:10", "id": "#001", "source": "Application", "msg": "Application has been initialized."}
-{"datetime": "2026-04-12 13:36:10", "id": "#002", "source": "Application", "msg": "Configuration file has been accessed."}
-{"datetime": "2026-04-12 13:36:13", "id": "#601", "source": "Application", "msg": "Serial has been initialized."}
-{"datetime": "2026-04-12 13:36:13", "id": "#603", "source": "Application", "msg": "Connection request has been sent to the controller."}
-{"datetime": "2026-04-12 13:36:13", "id": "#604", "source": "Controller", "msg": "Connection is successful."}
-{"datetime": "2026-04-12 13:36:13", "id": "#606", "source": "Application", "msg": "Configuration file has been sent to the controller."}
-{"datetime": "2026-04-12 13:36:13", "id": "#607", "source": "Controller", "msg": "Configuration file has been received."}
+{"datetime": "2026-08-04 12:01:40", "id": "#001", "source": "Application", "msg": "Application has been initialized."}
+{"datetime": "2026-08-04 12:01:40", "id": "#002", "source": "Application", "msg": "Configuration file has been accessed."}

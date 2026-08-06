@@ -106,6 +106,18 @@ class Sync:
                     
                     self.comm.send_config(self.parent.config)
 
+                    if self.comm.controller_version:
+                        if self.parent.firmware is not None and self.parent.firmware.winfo_exists():
+                            self.parent.firmware.r1_c1.configure(text=f"v{self.comm.controller_version} {self.comm.release_date}"   )
+
+                    try:
+                        from main import version
+                        from packaging.version import Version
+                        if Version(self.comm.controller_version) < Version(version):
+                            self.parent.settings_frame.open_update_controller()
+                    except Exception:
+                        pass
+
                     self.parent.settings_frame.r2_c1.configure(text="Connected")
 
                     def on_enter(event):
@@ -193,6 +205,8 @@ class Sync:
                 self.pid_calibration_status = False
             elif bfr == b'\x20\x06':
                 log("#531", "Controller", "Experiment has been started.")
+                self.pid_calibration_status = False
+                self.pid_calibration_restart = False
                 self.pid_experiment_status = True
             elif bfr == b'\x20\x07':
                 log("#532", "Controller", "Experiment has been completed successfully.")
@@ -213,16 +227,7 @@ class Sync:
             for key, value in bfr.items():
                 if key in self.parent.data:
                     self.parent.data[key]["value"] = value
-        
-        try:
-            from main import firmware_version
-            from packaging.version import Version
-            controller_version = bfr.get("firmware_version", "")
-            if controller_version and Version(controller_version) < Version(firmware_version):
-                self.parent.settings_frame.r2_c1.configure(text="⚠️ Update Firmware")
-        except Exception:
-            pass
-
+    
     def health(self):
         if self.comm:
             self.parent.health_frame.r0_c1.configure(text="Connected ⬤", text_color="green")
@@ -272,7 +277,6 @@ class Sync:
             self.parent.performance_frame.r5_c1.configure(text=f"{self.parent.data['left_loadcell_load_lbf']['value']:.2f}")
             self.parent.performance_frame.r6_c1.configure(text=f"{self.parent.data['total_load_lbf']['value']:.2f}")
             self.parent.performance_frame.r7_c1.configure(text=f"{self.parent.data['thermocouple_flow_temperature_c']['value']:.2f}")
-            self.parent.performance_frame.r8_c1.configure(text=self.parent.data['firmware_version']['value'])
 
             if self.parent.advanced_performance is not None and self.parent.advanced_performance.winfo_exists():
                 for key, entry in self.parent.data.items():
@@ -553,17 +557,5 @@ class Sync:
         if self.comm:
              self.comm.pid_experiment_terminate()
              self.experiment_data_count = 0
-        else:
-            pass
-    
-    def flash_write(self):
-        if self.comm:
-            self.comm.flash_write()
-        else:
-            pass
-
-    def flash_read(self):
-        if self.comm:
-            self.comm.flash_read()
         else:
             pass

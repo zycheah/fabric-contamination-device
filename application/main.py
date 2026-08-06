@@ -1,11 +1,13 @@
-# Author: Mehmet B. Sefer (Technical Project Specialist II)
+# Authors: Mehmet B. Sefer & Zi Ying Cheah
 # Organization: NexGenPPT @ Iowa State University
+# This project led by Mehmet B. Sefer from December 2024 to April 2026 
+# with contributions of Mitchell Strobbe and Zi Ying Cheah.
+# Ongoing efforts are led by Zi Ying Cheah since April 2026.
 
 import customtkinter as ctk
 
 title = "Fabric Contamination Device"
-app_version = "0.0.0"
-firmware_version = "1.0.0"
+version = "0.0.0"
 release_date = "12/25/2025"
 
 # ================= SPLASH SCREEN =================
@@ -35,7 +37,7 @@ class SplashScreen:
         center_frame = ctk.CTkFrame(bg_frame, fg_color="transparent")
         center_frame.pack(expand=True)
 
-        app_name = ctk.CTkLabel(center_frame, text=title + " " + app_version, font=("Arial", 24, "bold"), text_color="white")
+        app_name = ctk.CTkLabel(center_frame, text=title + " " + version, font=("Arial", 24, "bold"), text_color="white")
         app_name.pack(pady=10)
 
         loading_text = ctk.CTkLabel(center_frame, text="Loading...", font=("Open Sans", 14), text_color="white")
@@ -86,7 +88,7 @@ class App(ctk.CTk):
         log("#001", "Application", "Application has been initialized.")
 
         # ========== APPLICATION SETUP =======
-        self.title(title + " " + app_version)
+        self.title(title + " " + version)
         self.geometry("1920x1080")
         self.bind("<1>", lambda event: event.widget.focus_set())
         self._state_before_windows_set_titlebar_color = 'zoomed'
@@ -153,7 +155,7 @@ class App(ctk.CTk):
         self.firmware = None
         self.advanced_control = None
         self.PID_results = None
-        self.flash_test = None
+        self.update_controller = None
         
         self.protocol("WM_DELETE_WINDOW", self.exit)
 

@@ -1,10 +1,9 @@
-import re
 import customtkinter as ctk
 from customtkinter import filedialog
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from plots import create_surface_plot, update_surface_plot, create_pid_plot, update_pid_plot
-from popups import VariableSelection, AdvancedPerformance, AdvancedSettings, Maintenance, Diagnostics, Firmware, AdvancedControl, PIDResults
+from popups import VariableSelection, AdvancedPerformance, AdvancedSettings, Maintenance, Diagnostics, Firmware, UpdateController, AdvancedControl, PIDResults
 
 class HealthFrame(ctk.CTkFrame):
     def __init__(self, parent):
@@ -113,12 +112,6 @@ class PerformanceFrame(ctk.CTkFrame):
         self.r7_c1 = ctk.CTkLabel(self, text='0.00')
         self.r7_c1.grid(row=7, column=1, sticky="e", padx=10, pady=2)
 
-        self.r8_c0 = ctk.CTkLabel(self, text=parent.data["firmware_version"]["label"]+":")
-        self.r8_c0.grid(row=8, column=0, sticky="w", padx=10, pady=2)
-
-        self.r8_c1 = ctk.CTkLabel(self, text="")
-        self.r8_c1.grid(row=8, column=1, sticky="e", padx=10, pady=2)
-
     def open_advanced_performance(self):
         if self.parent.advanced_performance is None or not self.parent.advanced_performance.winfo_exists():
             self.parent.advanced_performance = AdvancedPerformance(self.parent)
@@ -195,6 +188,12 @@ class SettingsFrame(ctk.CTkFrame):
             self.parent.firmware = Firmware(self.parent)
         else:
             self.parent.firmware.focus()
+
+    def open_update_controller(self):
+        if self.parent.update_controller is None or not self.parent.update_controller.winfo_exists():
+            self.parent.update_controller = UpdateController(self.parent)
+        else:
+            self.parent.update_controller.focus()
 
 class ControlFrame(ctk.CTkFrame):
     def __init__(self, parent):

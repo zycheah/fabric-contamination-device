@@ -266,19 +266,28 @@ class Firmware(ctk.CTkToplevel):
         self.r0_c0 = ctk.CTkLabel(master=self.frame0, text="Firmware Version:")
         self.r0_c0.grid(row=0, column=0, sticky="w", padx=10, pady=2)
 
-        from main import app_version, release_date
-        self.r0_c1 = ctk.CTkLabel(master=self.frame0, text=f"v{app_version} ({release_date})")
+        from main import version, release_date
+        self.r0_c1 = ctk.CTkLabel(master=self.frame0, text=f"v{version} ({release_date})")
         self.r0_c1.grid(row=0, column=1, sticky="e", padx=10, pady=2)
 
-        self.r1_c0 = ctk.CTkLabel(master=self.frame0, text="Repository URL:")
+        self.r1_c0 = ctk.CTkLabel(master=self.frame0, text="Controller Version:")
         self.r1_c0.grid(row=1, column=0, sticky="w", padx=10, pady=2)
 
-        self.r1_c1 = ctk.CTkEntry(master=self.frame0, justify="left", width=300)
-        self.r1_c1.grid(row=1, column=1, sticky="e", padx=10, pady=(1, 2))
-        self.r1_c1.insert(0, "https://github.com/zycheah/fcd-gui-tests")
+        self.r1_c1 = ctk.CTkLabel(master=self.frame0, text="")
+        self.r1_c1.grid(row=1, column=1, sticky="e", padx=10, pady=2)
 
-        self.status_frame = ctk.CTkScrollableFrame(master=self.frame0, fg_color="#F9F9FA", height=290)
-        self.status_frame.grid(row=2, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
+        if self.parent.sync.comm is not None:
+            self.r1_c1.configure(text=f"v{self.parent.sync.comm.controller_version} {self.parent.sync.comm.release_date}")
+
+        self.r2_c0 = ctk.CTkLabel(master=self.frame0, text="Repository URL:")
+        self.r2_c0.grid(row=2, column=0, sticky="w", padx=10, pady=2)
+
+        self.repo_url = ctk.StringVar(value="https://github.com/zycheah/fcd-gui-tests")
+        self.r2_c1 = ctk.CTkEntry(master=self.frame0, justify="left", width=300, textvariable=self.repo_url)
+        self.r2_c1.grid(row=2, column=1, sticky="e", padx=10, pady=(1, 2))
+
+        self.status_frame = ctk.CTkScrollableFrame(master=self.frame0, fg_color="#F9F9FA", height=250)
+        self.status_frame.grid(row=3, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
         self.status_frame.grid_columnconfigure(0, weight=1)
 
         self.status = ctk.CTkLabel(master=self.status_frame, text="", justify="left", anchor="w")
@@ -287,13 +296,20 @@ class Firmware(ctk.CTkToplevel):
         self.refresh_button = ctk.CTkButton(master=self.frame0, text="↻", width=121, command=self.on_button_click)
         self.refresh_button.place(relx=1.0, rely=1.0, x=-20, y=-20, anchor="se")
 
-        self.firmware_button = ctk.CTkButton(master=self.frame0, text="Update Firmware", width=121, command=self.update_firmware)
+        self.firmware_button = ctk.CTkButton(master=self.frame0, text="Update Controller", width=121, command=self.update_firmware)
         self.firmware_button.place(relx=1.0, rely=1.0, x=-150, y=-20, anchor="se")
 
         self.update_status = None
         self.download_url = None
         self.check_for_updates()
     
+    def parse_repo(self):
+        url = self.repo_url.get().strip().rstrip("/")
+        parts = url.replace("https://github.com/", "").split("/")
+        if len(parts) < 2:
+            raise ValueError("Invalid GitHub repo URL")
+        return f"{parts[0]}/{parts[1]}"
+
     def on_button_click(self):
         if self.update_status == "update_available":
             if self.download_url:
@@ -315,15 +331,15 @@ class Firmware(ctk.CTkToplevel):
         self.update()
 
         try:
-            from main import app_version
+            from main import version
             from packaging.version import Version
             from github import Github
 
-            self.repo = Github().get_repo("zycheah/fcd-gui-tests")
+            self.repo = Github().get_repo(self.parse_repo())
             release_tag = self.repo.get_latest_release().tag_name.lstrip("v")
             release_date = self.repo.get_latest_release().published_at.strftime("%m/%d/%Y")
             
-            if Version(release_tag) > Version(app_version):
+            if Version(release_tag) > Version(version):
                 self.update_status = "update_available"
                 self.refresh_button.configure(text="Install")
                 self.new_version_info(release_tag, release_date)
@@ -351,7 +367,7 @@ class Firmware(ctk.CTkToplevel):
 
     def check_internet_connection(self):
         try:
-            requests.head(self.r1_c1.get(), timeout=5)
+            requests.head(self.r2_c1.get(), timeout=5)
             return True
         except Exception:
             return False
@@ -385,18 +401,17 @@ class Firmware(ctk.CTkToplevel):
             self.status.configure(text="No device detected. Please connect your controller via USB and try again.", text_color="red")
             return
         
-        import os
+        from main import resource_path
         fqbn = "rp2040:rp2040:adafruit_feather_can"
-        sketch = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "controller")
+        sketch = resource_path("controller")
+        arduino_cli = resource_path("tools/arduino-cli")
         port = self.parent.sync.comm._serial.port
-
+        
+        self.firmware_button.configure(state="disabled")
         self.status.configure(text="Compiling...\n\nPlease wait...", text_color="blue")
         self.update()
 
-        compile_result = subprocess.run(
-            ["arduino-cli", "compile", "--fqbn", fqbn, sketch],
-            capture_output=True, text=True
-        )
+        compile_result = subprocess.run([arduino_cli, "compile", "--fqbn", fqbn, sketch], capture_output=True, text=True)
 
         if compile_result.returncode != 0:
             self.status.configure(text=f"Compile failed:\n{compile_result.stderr}", text_color="red")
@@ -405,15 +420,37 @@ class Firmware(ctk.CTkToplevel):
         self.status.configure(text="Uploading...\n\nPlease wait...", text_color="blue")
         self.update()
 
-        upload_result = subprocess.run(
-            ["arduino-cli", "upload", "-p", port, "--fqbn", fqbn, sketch],
-            capture_output=True, text=True
-        )
+        upload_result = subprocess.run([arduino_cli, "upload", "-p", port, "--fqbn", fqbn, sketch], capture_output=True, text=True)
 
         if upload_result.returncode == 0:
             self.status.configure(text="✅ Firmware uploaded successfully!\n\nPlease click 'Connect' to reconnect to your controller.", text_color="green")
         else:
             self.status.configure(text=f"Upload failed:\n{upload_result.stderr}", text_color="red")
+
+        self.firmware_button.configure(state="normal")
+
+class UpdateController(ctk.CTkToplevel):
+    def __init__(self, parent):
+        super().__init__(parent, fg_color="#EBEBEB")
+        self.parent = parent
+
+        self.title("Update Controller Version")
+        self.geometry("350x100")
+        self.resizable(False, False)
+        self.transient(parent)
+        self.focus()
+
+        self.grid_rowconfigure(0, weight=100)
+        self.grid_columnconfigure(0, weight=100)
+
+        self.frame0 = ctk.CTkFrame(self, fg_color="#FFFFFF")
+        self.frame0.grid(row=0, column=0, rowspan=1, columnspan=1, sticky="nsew", padx=(10, 5), pady=(10, 10))
+
+        self.frame0.grid_columnconfigure(0, weight=1)
+        self.frame0.grid_columnconfigure(1, weight=1)
+
+        self.r0_c0 = ctk.CTkLabel(master=self.frame0, text="⚠️ Please update the controller version before connecting to the device.", wraplength=350, justify="center", text_color="red")
+        self.r0_c0.grid(row=0, column=0, padx=10, pady=(15, 10))
 
 class AdvancedControl(ctk.CTkToplevel):
     def __init__(self, parent):

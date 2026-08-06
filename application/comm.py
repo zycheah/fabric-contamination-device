@@ -3,7 +3,6 @@ import struct
 from diagnostics import log
 import json
 import time
-import threading
 
 class Comm:
     def __init__(self, port, baudrate, timeout, frequency):
@@ -25,8 +24,17 @@ class Comm:
         self._serial.write(struct.pack('<BB', 0xAA, 0x00))
         log("#603", "Application", "Connection request has been sent to the controller.")
 
-        cmd = self._serial.read(4)
-        if cmd == b'\xCC\x00\x00\xEE':
+        cmd = self._serial.read(11)
+        if cmd[:3] == b'\xCC\x00\x00' and cmd[-1:] == b'\xEE':
+
+            version = (cmd[3], cmd[4], cmd[5])
+            year = (cmd[6] << 8) | cmd[7]
+            month = cmd[8]
+            day = cmd[9]
+
+            self.controller_version = f"{version[0]}.{version[1]}.{version[2]}"
+            self.release_date = f"({month}/{day}/{year})"
+
             log("#604", "Controller", "Connection is successful.")
         else:
             log("#605", "Application", "Connection is not successful.")
@@ -72,7 +80,7 @@ class Comm:
             elif hdr == b'\xDD':
                 data = self._serial.read_until(expected=b'\xEE').decode(errors='ignore').strip().split(',')
 
-                if len(data) != 28:
+                if len(data) != 27:
                     return None, None
 
                 data_map = {
@@ -102,8 +110,7 @@ class Comm:
                     "pid_overshoot_percent": float(data[23]),
                     "pid_settling_time_s": float(data[24]),
                     "pid_load_error_running_avg_percent": float(data[25]),
-                    "thermocouple_flow_temperature_c": float(data[26]),
-                    "firmware_version": data[27]
+                    "thermocouple_flow_temperature_c": float(data[26])
                 }
 
                 return hdr, data_map
@@ -215,117 +222,3 @@ class Comm:
             log("#630", "Application", "The command has been sent to the controller to terminate the experiment.")
         except Exception:
             pass
-
-    # ==================== FLASH TEST COMMANDS ====================
-    def flash_write(self, message="Hello from GUI!", callback=None):
-        try:
-            print("\n=== FLASH TEST DEBUG ===")
-                
-            # Clear any old data in buffer
-            old_data = self._serial.read_all()
-            if old_data:
-                print(f"0. Cleared old buffer data: {old_data}")
-            print("1. Serial buffer cleared")
-            
-            # Prepare the message
-            message_bytes = message.encode('utf-8')
-            msg_length = len(message_bytes)
-            
-            if msg_length > 255:
-                print("ERROR: Message too long (max 255 bytes)")
-                if callback:
-                    callback("ERROR: Message too long")
-                return
-            
-            print(f"2. Preparing to send: '{message}' ({msg_length} bytes)")
-            
-            # Send command 0x30 + message length + message
-            self._serial.write(struct.pack('<BB', 0xAA, 0x30))  # Command header
-            self._serial.write(struct.pack('B', msg_length))     # Message length
-            self._serial.write(message_bytes)                    # Actual message
-            
-            log("#701", "Application", f"Flash write command sent with message: {message}")
-            print(f"3. Sent to Arduino: Command=0x30, Length={msg_length}, Message='{message}'")
-
-        except Exception:
-            pass
-
-    
-    def flash_read(self, callback=None):
-        # Wait for Arduino to process (write to flash + read back)
-        try:
-            print("4. Waiting 2 seconds for Arduino to write and read flash...")
-            time.sleep(2.0)
-
-            self._serial.write(struct.pack('<BB', 0xAA, 0x31))  # Command header
-            # Read response from Arduino
-            flash_message = ""
-            lines_received = []
-            timeout = time.time() + 5.0  # Increased to 5 second timeout
-            flash_complete = False
-            
-            print("5. Reading response from Arduino...")
-            print(f"   Bytes available: {self._serial.in_waiting}")
-            
-            while time.time() < timeout and not flash_complete:
-                if self._serial.in_waiting > 0:
-                    try:
-                        line = self._serial.readline().decode('utf-8', errors='ignore').strip()
-                        
-                        # Log ALL lines for debugging
-                        print(f"   Raw line: '{line}' (len={len(line)})")
-                        
-                        # Log all lines (even empty ones for debugging)
-                        if line or True:  # Always process
-                            if line and line.startswith("FLASH"):
-                                print(f"   Received: {line}")
-                                lines_received.append(line)
-                            elif line:
-                                # Non-FLASH lines (could be errors or debug from Arduino)
-                                print(f"   Other: {line}")
-                            
-                            # Check if this is the data line
-                            if line.startswith("FLASH_DATA:"):
-                                flash_message = line.replace("FLASH_DATA:", "").strip()
-                                log("#702", "Controller", f"Flash data received: {flash_message}")
-                                print(f"   ✓ Flash returned: {flash_message}")
-                            
-                            # Check if we're done
-                            elif line == "FLASH_END":
-                                print(f"   ✓ Received FLASH_END, completing...")
-                                flash_complete = True
-                                break
-                                
-                            # Check for errors
-                            elif line.startswith("FLASH_ERROR:"):
-                                error_msg = line.replace("FLASH_ERROR:", "")
-                                log("#703", "Controller", f"Flash error: {error_msg}")
-                                flash_message = f"ERROR: {error_msg}"
-                                print(f"   ✗ Error: {error_msg}")
-                                flash_complete = True
-                                break
-                                
-                    except Exception as e:
-                        print(f"   ! Decode error: {e}")
-                        continue
-                else:
-                    time.sleep(0.05)
-
-            print(f"6. Total lines received: {len(lines_received)}")
-            
-            # Call callback with result
-            if callback:
-                callback(flash_message)
-                    
-            else:
-                log("#704", "Application", "No flash data received.")
-                print("✗ No flash data received")
-                print(f"   All lines: {lines_received}")
-                
-                if callback:
-                    callback("No response")
-
-            print("=== FLASH TEST END ===\n")
-
-        except Exception:
-            pass 

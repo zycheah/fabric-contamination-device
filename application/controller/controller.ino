@@ -1,8 +1,21 @@
-// Author: Mehmet B. Sefer (Technical Project Specialist II)
+// Authors: Mehmet B. Sefer & Zi Ying Cheah
 // Organization: NexGenPPT @ Iowa State University
+// This project led by Mehmet B. Sefer from December 2024 to April 2026 
+// with contributions of Mitchell Strobbe and Zi Ying Cheah.
+// Ongoing efforts are led by Zi Ying Cheah since April 2026.
 
-// version = 1.1
-// release_date = "12/25/2025"
+#define CONTROLLER_VERSION "0.0.0"
+#define RELEASE_DATE "12/25/2025"
+
+struct ControllerInfo {
+  static constexpr uint8_t version_major = 0;
+  static constexpr uint8_t version_minor = 0;
+  static constexpr uint8_t version_patch = 0;
+
+  static constexpr uint16_t release_year = 2025;
+  static constexpr uint8_t release_month = 12;
+  static constexpr uint8_t release_day = 25;
+};
   
 #include <MobaTools.h>
 #include <Adafruit_ADS1X15.h>
@@ -11,16 +24,6 @@
 #include "hardware/watchdog.h"
 #include <limits>
 #include <Smoothed.h> 
-
-#include <Adafruit_SPIFlash.h>
-#include <SPI.h>
-#include "sdFat_Adafruit_Fork.h"
-#include "flash_config.h"
-
-Adafruit_SPIFlash flash(&flashTransport);
-FatVolume fatfs;
-
-#define FILE_PATH "/test.txt"
 
 Smoothed <int16_t> right_loadcell_adc_16bit_smoothed; 
 Smoothed <int16_t> left_loadcell_adc_16bit_smoothed;
@@ -187,99 +190,6 @@ void seq_start(Action actions[], uint8_t count) {
   seq_index    = 0;
   seq_active   = true;
   seq_actions[0]();
-}
-
-bool init_flash() {
-  if (!flash.begin()) {
-    Serial.println("Error, failed to initialize flash chip!");
-    while (1) {
-      delay(1);
-    }
-  }
-  
-  Serial.print(F("Flash chip JEDEC ID: 0x"));
-  Serial.println(flash.getJEDECID(), HEX);
-  Serial.print(F("Flash size: "));
-  Serial.print(flash.size() / 1024);
-  Serial.println(F(" KB"));
-  
-  if (!fatfs.begin(&flash)) {
-    Serial.println(F("Filesystem not found - format flash first"));
-    return false;
-  }
-  
-  Serial.println(F("Flash ready!"));
-  return true;
-}
-
-void spi_write(String message){
-  // Step 1: Initialize flash
-  if (!flash.begin()) {
-    Serial.println("FLASH_ERROR:Init_Failed");
-    return;
-  }
-  
-  if (!fatfs.begin(&flash)) {
-    Serial.println("FLASH_ERROR:Mount_Failed");
-    return;
-  }
-
-  // Step 2: Write the GUI message to flash
-  // Use O_WRITE | O_CREAT | O_TRUNC to overwrite file (not append)
-  File32 writeFile = fatfs.open(FILE_PATH, O_WRITE | O_CREAT | O_TRUNC);
-  if (!writeFile) {
-    Serial.println("FLASH_ERROR:Write_Open_Failed");
-    return;
-  }
-
-  writeFile.println(message);  // Write the message from GUI
-  writeFile.close();
-}
-
-void spi_read(){
-  // Step 1: Initialize flash
-  if (!flash.begin()) {
-    Serial.println("FLASH_ERROR:Init_Failed");
-    return;
-  }
-  
-  if (!fatfs.begin(&flash)) {
-    Serial.println("FLASH_ERROR:Mount_Failed");
-    return;
-  }
-
-  // Step 2: Read back from flash
-  File32 readFile = fatfs.open(FILE_PATH, FILE_READ);
-  if (!readFile) {
-    Serial.println("FLASH_ERROR:Read_Open_Failed");
-    return;
-  }
-
-  // Read the entire content
-  String flashContent = "";
-  while (readFile.available()) {
-    flashContent += (char)readFile.read();
-  }
-  readFile.close();
-  
-  Serial.print(flashContent);
-  Serial.println("'");
-  Serial.println(flashContent.length());
-  
-  // Trim trailing newlines to avoid double-newline issue
-  flashContent.trim();
-  Serial.print(flashContent);
-  Serial.println("'");
-
-  // Small delay before sending
-  delay(100);
-
-  // Step 4: Send the content back to GUI
-  Serial.println("FLASH_START");
-  Serial.print("FLASH_DATA:");
-  Serial.println(flashContent);
-  Serial.println("FLASH_END");
-  Serial.flush();
 }
 
 void tmc_enable() {
@@ -467,6 +377,10 @@ void pid_experiment_3() {
 
 void pid_experiment_4() {
 
+  rotary_motor_current_position_deg = rotary_motor.read();
+  total_revolution_rev += fabs((float)(rotary_motor_current_position_deg - rotary_motor_initial_position_deg) / 360.0f);
+  rotary_motor_initial_position_deg = rotary_motor_current_position_deg;
+
   if (total_revolution_rev >= pid_experiment_revolution_half_rev) {
     seq_index++;
     return;
@@ -506,10 +420,6 @@ void pid_experiment_4() {
     right_z_axis_motor.rotate(0);
     left_z_axis_motor.rotate(0);
   }
-
-  rotary_motor_current_position_deg = rotary_motor.read();
-  total_revolution_rev += fabs((float)(rotary_motor_current_position_deg - rotary_motor_initial_position_deg) / 360.0f);
-  rotary_motor_initial_position_deg = rotary_motor_current_position_deg;
 }
 
 void pid_experiment_5() {
@@ -524,6 +434,10 @@ void pid_experiment_5() {
 
 void pid_experiment_6() {
 
+  rotary_motor_current_position_deg = rotary_motor.read();
+  total_revolution_rev += fabs((float)(rotary_motor_current_position_deg - rotary_motor_initial_position_deg) / 360.0f);
+  rotary_motor_initial_position_deg = rotary_motor_current_position_deg;
+  
   if (total_revolution_rev >= pid_experiment_revolution_rev) {
     seq_index++;
     return;
@@ -564,9 +478,6 @@ void pid_experiment_6() {
     left_z_axis_motor.rotate(0);
   }
 
-  rotary_motor_current_position_deg = rotary_motor.read();
-  total_revolution_rev += fabs((float)(rotary_motor_current_position_deg - rotary_motor_initial_position_deg) / 360.0f);
-  rotary_motor_initial_position_deg = rotary_motor_current_position_deg;
 }
 
 void pid_swing_1(){
@@ -696,14 +607,7 @@ void setup() {
   Serial.begin(115200);
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
-  
-  while (!Serial) delay(10);
-  
-  Serial.println(F("\n=== Flash Test Starting ==="));
-  // Initialize flash
-  init_flash();
-  
-  Serial.println(F("Setup complete"));
+
   tmc_enable();
 
   right_loadcell_adc_16bit_smoothed.begin(SMOOTHED_AVERAGE, 10);
@@ -717,13 +621,37 @@ void setup() {
   delay(1000);
 }
 
+void send_connect_packet(uint8_t status) {
+  uint8_t packet[] = {
+    0xCC,
+    0x00,
+    status,
+
+    ControllerInfo::version_major,
+    ControllerInfo::version_minor,
+    ControllerInfo::version_patch,
+
+    (uint8_t)(ControllerInfo::release_year >> 8),
+    (uint8_t)(ControllerInfo::release_year & 0xFF),
+
+    ControllerInfo::release_month,
+    ControllerInfo::release_day,
+
+    0xEE
+  };
+
+  Serial.write(packet, sizeof(packet));
+}
+
 void comm() {
   if (Serial.available() >= 2 && Serial.read() == 0xAA) {
     comm_status = true;
     uint8_t cmd = Serial.read();
     switch(cmd) {
       case 0x00: {//Connect
-        Serial.write((uint8_t*)"\xCC\x00\x00\xEE", 4);
+        // Serial.write((uint8_t*)"\xCC\x00\x00\x00\x00\x00\x0C\xEE", 4);
+        // Serial.write((uint8_t*)"\xCC\x00\x00\xEE", 4);
+        send_connect_packet(0x00);
         delay(100);
         break;
       }
@@ -999,29 +927,6 @@ void comm() {
         seq_start(go_home_all_motors, sizeof(go_home_all_motors)/sizeof(go_home_all_motors[0]));
         Serial.write((uint8_t*)"\xCC\x21\x00\xEE", 4);
         comm_status = false;
-        break;
-      case 0x30: {// SPI Flash Test 
-        // Read the message length
-        while (Serial.available() < 1) { delay(1); }
-        uint8_t msg_length = Serial.read();
-        
-        // Read the message itself
-        String message_from_gui = "";
-        for (int i = 0; i < msg_length; i++) {
-          while (Serial.available() < 1) { delay(1); }
-          message_from_gui += (char)Serial.read();
-        }
-        
-        // Write to flash and read back
-        spi_write(message_from_gui);
-        comm_status = false;
-        break;
-      }
-      case 0x31:
-        spi_read();
-        comm_status = false;
-        break;
-      default:
         break;
     }
   }
