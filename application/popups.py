@@ -282,7 +282,7 @@ class Firmware(ctk.CTkToplevel):
         self.r2_c0 = ctk.CTkLabel(master=self.frame0, text="Repository URL:")
         self.r2_c0.grid(row=2, column=0, sticky="w", padx=10, pady=2)
 
-        self.repo_url = ctk.StringVar(value="https://github.com/zycheah/fcd-gui-tests")
+        self.repo_url = ctk.StringVar(value="https://github.com/zycheah/fabric-contamination-device")
         self.r2_c1 = ctk.CTkEntry(master=self.frame0, justify="left", width=300, textvariable=self.repo_url)
         self.r2_c1.grid(row=2, column=1, sticky="e", padx=10, pady=(1, 2))
 

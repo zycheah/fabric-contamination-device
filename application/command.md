@@ -39,18 +39,18 @@ arduino-cli upload -p /dev/tty.usbmodem101 --fqbn rp2040:rp2040:adafruit_feather
 pyinstaller --noconfirm --onefile --console \
   --hidden-import=mplcyberpunk \
   --collect-all mplcyberpunk \
-  --add-data "/Users/zying/Downloads/fcd-gui-tests-main/fcd-gui-tests/application/data:data/" \
-  --add-data "/Users/zying/Downloads/fcd-gui-tests-main/fcd-gui-tests/controller:controller/" \
-  "/Users/zying/Downloads/fcd-gui-tests-main/fcd-gui-tests/application/main.py"
+  --add-data "/Users/zying/Downloads/fabric-contamination-device-main/fabric-contamination-device/application/data:data/" \
+  --add-data "/Users/zying/Downloads/fabric-contamination-device-main/fabric-contamination-device/controller:controller/" \
+  "/Users/zying/Downloads/fabric-contamination-device-main/fabric-contamination-device/application/main.py"
 
 
 
 pyinstaller --noconfirm --onedir --windowed \
   --hidden-import=mplcyberpunk \
   --collect-all mplcyberpunk 
-  --add-data "/Users/zying/Downloads/fcd-gui-tests-main/fcd-gui-tests/application/data:data/" \
-  --add-data "/Users/zying/Downloads/fcd-gui-tests-main/fcd-gui-tests/controller:controller/" \
-  "/Users/zying/Downloads/fcd-gui-tests-main/fcd-gui-tests/application/main.py"
+  --add-data "/Users/zying/Downloads/fabric-contamination-device-main/fabric-contamination-device/application/data:data/" \
+  --add-data "/Users/zying/Downloads/fabric-contamination-device-main/fabric-contamination-device/controller:controller/" \
+  "/Users/zying/Downloads/fabric-contamination-device-main/fabric-contamination-device/application/main.py"
 
 
   --target-architecture universal2 \
@@ -58,14 +58,14 @@ pyinstaller --noconfirm --onedir --windowed \
 pyinstaller --noconfirm --onedir --windowed \ 
   --hidden-import=mplcyberpunk \
   --collect-all mplcyberpunk \
-  --add-data "/Users/zying/Desktop/ISU/Work/NexGenPPT/fcd-gui-tests-main/fcd-gui-tests/application/data:data/" \
-  --add-data "/Users/zying/Desktop/ISU/Work/NexGenPPT/fcd-gui-tests-main/fcd-gui-tests/controller:controller/" \
-  "/Users/zying/Desktop/ISU/Work/NexGenPPT/fcd-gui-tests-main/fcd-gui-tests/application/main.py"
+  --add-data "/Users/zying/Desktop/ISU/Work/NexGenPPT/fabric-contamination-device-main/fabric-contamination-device/application/data:data/" \
+  --add-data "/Users/zying/Desktop/ISU/Work/NexGenPPT/fabric-contamination-device-main/fabric-contamination-device/controller:controller/" \
+  "/Users/zying/Desktop/ISU/Work/NexGenPPT/fabric-contamination-device-main/fabric-contamination-device/application/main.py"
 
 pyinstaller --noconfirm --onedir --noconsole \
 --hidden-import=mplcyberpunk \
 --collect-all mplcyberpunk \
---add-data "/Users/zying/Desktop/ISU/Work/NexGenPPT/fcd-gui-tests-main/fcd-gui-tests/application/data:data/" \
---add-data "/Users/zying/Desktop/ISU/Work/NexGenPPT/fcd-gui-tests-main/fcd-gui-tests/application/controller:controller/" \
---add-data "/Users/zying/Desktop/ISU/Work/NexGenPPT/fcd-gui-tests-main/fcd-gui-tests/application/tools:tools/" \
-"/Users/zying/Desktop/ISU/Work/NexGenPPT/fcd-gui-tests-main/fcd-gui-tests/application/main.py"
+--add-data "/Users/zying/Desktop/ISU/Work/NexGenPPT/fabric-contamination-device-main/fabric-contamination-device/application/data:data/" \
+--add-data "/Users/zying/Desktop/ISU/Work/NexGenPPT/fabric-contamination-device-main/fabric-contamination-device/application/controller:controller/" \
+--add-data "/Users/zying/Desktop/ISU/Work/NexGenPPT/fabric-contamination-device-main/fabric-contamination-device/application/tools:tools/" \
+"/Users/zying/Desktop/ISU/Work/NexGenPPT/fabric-contamination-device-main/fabric-contamination-device/application/main.py"
